@@ -1,4 +1,4 @@
-module spotlight_backend
+module spotlight
 
 go 1.23.5
 
