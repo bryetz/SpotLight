@@ -1,13 +1,12 @@
 package main
 
 import (
+	"SpotLight/backend/src/database"
 	"bufio"
 	"fmt"
 	"log"
 	"os"
 	"strings"
-
-	"spotlight/backend/database"
 )
 
 func main() {

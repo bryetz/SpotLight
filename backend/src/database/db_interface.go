@@ -73,6 +73,30 @@ func (db *DBInterface) Register(username, password string) error {
 	return nil
 }
 
+// Login authenticates the user and sets the current session.
+func (db *DBInterface) Login(username, password string) error {
+	var userID int
+	var storedHash string
+
+	// Retrieve user credentials from the database.
+	err := db.conn.QueryRow(context.Background(), "SELECT id, password_hash FROM users WHERE username=$1", username).Scan(&userID, &storedHash)
+	if err != nil {
+		log.Printf("Login failed for user %s: %v", username, err)
+		return fmt.Errorf("invalid username or password")
+	}
+
+	// Verify the provided password against the stored hash.
+	if err := bcrypt.CompareHashAndPassword([]byte(storedHash), []byte(password)); err != nil {
+		log.Println("Incorrect password attempt")
+		return fmt.Errorf("invalid username or password")
+	}
+
+	// Set the current user ID.
+	db.currentUserID = userID
+	fmt.Println("Login successful!")
+	return db.ViewPosts()
+}
+
 // ViewPosts retrieves and displays all posts from the database.
 func (db *DBInterface) ViewPosts() error {
 	rows, err := db.conn.Query(context.Background(), "SELECT p.id, u.username, p.content, p.created_at FROM posts p JOIN users u ON p.user_id = u.id")
@@ -104,28 +128,115 @@ func (db *DBInterface) ViewPosts() error {
 	return nil
 }
 
-// Login authenticates the user and sets the current session.
-func (db *DBInterface) Login(username, password string) error {
-	var userID int
-	var storedHash string
+func (db *DBInterface) HandleRegister(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
 
-	// Retrieve user credentials from the database.
-	err := db.conn.QueryRow(context.Background(), "SELECT id, password_hash FROM users WHERE username=$1", username).Scan(&userID, &storedHash)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	err := db.Register(req.Username, req.Password)
 	if err != nil {
-		log.Printf("Login failed for user %s: %v", username, err)
-		return fmt.Errorf("invalid username or password")
+		http.Error(w, "User registration failed", http.StatusInternalServerError)
+		return
 	}
 
-	// Verify the provided password against the stored hash.
-	if err := bcrypt.CompareHashAndPassword([]byte(storedHash), []byte(password)); err != nil {
-		log.Println("Incorrect password attempt")
-		return fmt.Errorf("invalid username or password")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]string{"message": "User registered successfully"})
+}
+
+func (db *DBInterface) HandleLogin(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
 	}
 
-	// Set the current user ID.
-	db.currentUserID = userID
-	fmt.Println("Login successful!")
-	return db.ViewPosts()
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	err := db.Login(req.Username, req.Password)
+	if err != nil {
+		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]string{"message": "Login successful"})
+}
+
+func (db *DBInterface) HandlePosts(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case "GET":
+		// JOIN posts with users to get usernames
+		rows, err := db.conn.Query(context.Background(), `
+			SELECT p.id, u.username, p.content, p.latitude, p.longitude, p.created_at
+			FROM posts p
+			JOIN users u ON p.user_id = u.id
+			ORDER BY p.created_at DESC`)
+		if err != nil {
+			log.Printf("Error retrieving posts: %v", err)
+			http.Error(w, "Failed to retrieve posts", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		var posts []map[string]interface{}
+		for rows.Next() {
+			var postID int
+			var username, content string
+			var latitude, longitude float64
+			var createdAt time.Time
+
+			if err := rows.Scan(&postID, &username, &content, &latitude, &longitude, &createdAt); err != nil {
+				log.Printf("Error scanning post row: %v", err)
+				continue
+			}
+
+			posts = append(posts, map[string]interface{}{
+				"post_id":    postID,
+				"username":   username, // Now returning username instead of user_id
+				"content":    content,
+				"latitude":   latitude,
+				"longitude":  longitude,
+				"created_at": createdAt.Format(time.RFC3339),
+			})
+		}
+
+		// Send JSON response
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(posts)
+
+	case "POST":
+		// Handle creating a post
+		var req struct {
+			UserID    int     `json:"user_id"`
+			Content   string  `json:"content"`
+			Latitude  float64 `json:"latitude"`
+			Longitude float64 `json:"longitude"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid request payload", http.StatusBadRequest)
+			return
+		}
+
+		_, err := db.conn.Exec(context.Background(),
+			"INSERT INTO posts (user_id, content, latitude, longitude) VALUES ($1, $2, $3, $4)",
+			req.UserID, req.Content, req.Latitude, req.Longitude)
+		if err != nil {
+			log.Printf("Error creating post: %v", err)
+			http.Error(w, "Failed to create post", http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Post created successfully"})
+	}
 }
 
 // getLocation retrieves the user's location using an external API.
