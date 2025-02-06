@@ -1,5 +1,11 @@
-import Feed from './components/Home/Feed';
+'use client';
 
-export default function Page() {
-  return <Feed />;
+import { Feed } from '@/app/components/features/Feed';
+
+export default function Home() {
+  return (
+    <main className="min-h-screen">
+      <Feed />
+    </main>
+  );
 }

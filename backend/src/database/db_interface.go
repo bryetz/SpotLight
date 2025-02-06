@@ -214,7 +214,7 @@ func (db *DBInterface) HandlePosts(w http.ResponseWriter, r *http.Request) {
 	case "POST":
 		// Handle creating a post
 		var req struct {
-			UserID    int     `json:"user_id"`
+			// UserID    int     `json:"user_id"`
 			Content   string  `json:"content"`
 			Latitude  float64 `json:"latitude"`
 			Longitude float64 `json:"longitude"`
@@ -227,7 +227,8 @@ func (db *DBInterface) HandlePosts(w http.ResponseWriter, r *http.Request) {
 
 		_, err := db.conn.Exec(context.Background(),
 			"INSERT INTO posts (user_id, content, latitude, longitude) VALUES ($1, $2, $3, $4)",
-			req.UserID, req.Content, req.Latitude, req.Longitude)
+			// req.UserID, req.Content, req.Latitude, req.Longitude)
+			db.currentUserID, req.Content, req.Latitude, req.Longitude)
 		if err != nil {
 			log.Printf("Error creating post: %v", err)
 			http.Error(w, "Failed to create post", http.StatusInternalServerError)
