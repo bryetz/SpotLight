@@ -1,5 +1,4 @@
 import { Post } from '@/app/types/post';
-import { formatDistanceToNow } from 'date-fns';
 import { MapPin, MessageCircle, Heart, Share2 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -16,7 +15,21 @@ export function PostCard({ post }: { post: Post }) {
         setIsLiked(!isLiked);
     };
 
-    const timeAgo = formatDistanceToNow(new Date(post.created_at), { addSuffix: true });
+    const formatDate = (dateString: string) => {
+        const date = new Date(dateString);
+        const options: Intl.DateTimeFormatOptions = {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: 'numeric',
+            hour12: true,
+            timeZone: 'UTC',
+        };
+        return new Intl.DateTimeFormat('en-US', options).format(date);
+    };
+
+    const formattedDateTime = formatDate(post.created_at);
 
     return (
         <div className="bg-black/20 backdrop-blur-[4px] border border-[#343536] rounded-lg p-4 hover:border-[#4e4f50] transition-all duration-300 hover:shadow-lg hover:shadow-black/5">
@@ -26,9 +39,7 @@ export function PostCard({ post }: { post: Post }) {
                 {post.username}
             </span>
             <span className="mx-1.5">•</span>
-            <span className="text-[#818384]">
-                {timeAgo}
-            </span>
+            <span className="text-[#818384]">{formattedDateTime}</span>
             </div>
         </div>
 
