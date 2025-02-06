@@ -15,6 +15,7 @@ export function Feed() {
     const fetchPosts = async () => {
       try {
         const response = await getPosts();
+        
         console.log('Posts received:', response.data);
         setPosts(response.data || []); // Ensure we always set an array
       } catch (error) {
