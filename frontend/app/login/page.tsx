@@ -20,16 +20,33 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const response = await (mode === 'login' ? login(username, password) : register(username, password));
-      
-      // Store auth token and update auth state
-      const token = response.data.token;
-      localStorage.setItem('authToken', token);
-      setAuth(username, token, 1); // TODO: remove this, this is placeholder because there is no user id in the database yet
-      
-      // Redirect to home page
-      router.push('/');
-      router.refresh();
+      if (mode === 'login') {
+        const response = await login(username, password);
+        
+        // Store auth token and update auth state
+        console.log('Response from login is:', response.data);
+        console.log('Response from login is:', response.data.token);
+        const token = response.data.token;
+        localStorage.setItem('authToken', token);
+        setAuth(username, token, 1); // TODO: remove this, this is placeholder because there is no user id in the database yet
+        
+        // Redirect to home page
+        router.push('/');
+        router.refresh();
+      } else {
+        // Registration mode
+        await register(username, password);
+        
+        // Automatically log in the user after successful registration
+        const loginResponse = await login(username, password);
+        const token = loginResponse.data.token;
+        localStorage.setItem('authToken', token);
+        setAuth(username, token, 1);
+        
+        // Redirect to home page
+        router.push('/');
+        router.refresh();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
     }

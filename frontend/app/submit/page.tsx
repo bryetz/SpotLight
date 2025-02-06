@@ -85,7 +85,7 @@ export default function SubmitPage() {
 
     try {
       await createPost({
-        user_id: userId || 1, // TODO: remove this, this is placeholder because there is no user id in the database yet
+        // user_id: userId || 1, // TODO: remove this, this is placeholder because there is no user id in the database yet
         content: content.trim(),
         latitude: location.lat,
         longitude: location.lon,
@@ -121,7 +121,7 @@ export default function SubmitPage() {
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 placeholder="What's on your mind?"
-                className="w-full px-3 py-2 bg-black/40 border border-[#343536] rounded-md text-white text-sm focus:outline-none focus:border-[#4e4f50] transition-colors min-h-[120px] resize-none"
+                className="w-full px-3 py-2 bg-black/40 border border-[#343536] rounded-md text-white text-sm focus:outline-none focus:border-[#4e4f50] transition-colors min-h-[180px] resize-none"
                 maxLength={500}
               />
               <div className="mt-1 text-xs text-[#818384] flex justify-between">
