@@ -1,1 +1,6 @@
+backend/.env
+.vscode/
+.vs/
+backend/*.exe
+backend/*.bat
 .env

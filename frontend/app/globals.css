@@ -1,0 +1,97 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background: linear-gradient(to bottom right, #09090B, #10141E);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+.dot-grid {
+  background-image: radial-gradient(circle at 0.5px 0.5px, #333 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-attachment: fixed;
+  position: fixed;
+  top: 48px; /* Just under the header (h-12 = 48px) */
+  left: 0px; /* Offset from left */
+  width: calc(100% - 8px); /* Adjust width to account for left offset */
+  height: calc(100% - 48px); /* Adjust height to account for top offset */
+  z-index: -1;
+  pointer-events: none;
+  mask-image: linear-gradient(to bottom, 
+    rgba(0, 0, 0, 1) 0%, 
+    rgba(0, 0, 0, 0.7) 50%, 
+    rgba(0, 0, 0, 0.2) 100%
+  );
+  -webkit-mask-image: linear-gradient(to bottom, 
+    rgba(0, 0, 0, 1) 0%, 
+    rgba(0, 0, 0, 0.7) 50%, 
+    rgba(0, 0, 0, 0.2) 100%
+  );
+}
+
+@keyframes gradient-move {
+  0% { background-position: 0% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.big-logo-animation {
+	background: linear-gradient(
+	  to right,
+	  #a78bfa,
+	  #60a5fa 50%,
+	  #a78bfa 100%
+	);
+	background-size: 200% 100%;
+	-webkit-background-clip: text;
+	background-clip: text;
+	color: transparent;
+	animation: gradient-move 3s linear reverse infinite;
+	line-height: 1.2;
+	padding-bottom: 6px;
+  }
+
+.logo-hover {
+  background: linear-gradient(
+    to right,
+    #a78bfa,
+    #60a5fa 50%,
+    #a78bfa 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  transition: color 0.3s ease;
+}
+
+.logo-hover:hover {
+  color: transparent;
+  animation: gradient-move 1s linear reverse infinite;
+}
+
+/* Webkit scrollbar styles */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1a1a1b;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #343536;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4a4b4c;
+}
+
+/* Firefox scrollbar styles */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #343536 #1a1a1b;
+}
+
