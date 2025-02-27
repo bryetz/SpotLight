@@ -118,9 +118,53 @@ func (db *DBInterface) GetPosts() ([]map[string]interface{}, error) {
 	rows, err := db.conn.Query(context.Background(),
 		"SELECT p.id, u.username, p.content, p.latitude, p.longitude, p.created_at FROM posts p JOIN users u ON p.user_id = u.id ORDER BY p.created_at DESC")
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve posts: %w", err)
+		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
+		return
 	}
-	defer rows.Close()
+
+	json.NewEncoder(w).Encode(map[string]string{"message": "Login successful"})
+}
+
+func (db *DBInterface) HandlePosts(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case "GET":
+		// JOIN posts with users to get usernames
+		// until we get data from the request body specifying both location of request and distance perferred,
+		// we will arbitrarily compare server location and not show posts beyond 15 kilometers
+		// the query is based on the Haversine formula to approx earth as a sphere instead of ellipse
+		lat, long, err := getLocation() // location of server instead of user for now...
+		if err != nil {
+			fmt.Println(err)
+		}
+		var distance int = 15000 // arbitrary cutoff distance in meters to stop showing posts far away
+		var getQuery string = fmt.Sprintf(`
+		SELECT p.id, u.username, p.content, p.latitude, p.longitude, p.created_at
+		FROM posts p
+		JOIN users u ON p.user_id = u.id
+		WHERE ( 6371000 * acos(
+				cos(radians(%f)) * cos(radians(p.latitude)) *
+				cos(radians(p.longitude) - radians(%f)) +
+				sin(radians(%f)) * sin(radians(p.latitude))
+			) ) <= %d
+		ORDER BY p.created_at DESC;`, lat, long, lat, distance)
+
+		/* // feel free to add this as an additional column in the response to show how far the post is from the user!
+		( 6371000 * acos(
+			cos(radians(%f)) * cos(radians(p.latitude)) *
+			cos(radians(p.longitude) - radians(%f)) +
+			sin(radians(%f)) * sin(radians(p.latitude))
+		) ) AS distance_meters
+		*/
+		// also could order by smallest distance assuming we incorporate above
+		// ORDER BY distance_meters ASC, p.created_at DESC;
+
+		rows, err := db.conn.Query(context.Background(), getQuery)
+		if err != nil {
+			log.Printf("Error retrieving posts: %v", err)
+			http.Error(w, "Failed to retrieve posts", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
 
 	var posts []map[string]interface{}
 	for rows.Next() {
