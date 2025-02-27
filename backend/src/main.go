@@ -9,6 +9,7 @@ import (
 	"regexp"
 
 	"SpotLight/backend/src/database"
+
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 )
@@ -81,6 +82,9 @@ func (h *RequestHandler) registerRoutes(r *mux.Router) {
 // Main function
 func main() {
 	log.Println("Starting the API backend...")
+
+	fm := database.NewFileManager()
+	fm.TestFunc() // only here to show it is 'used' but will remove once we incorporate it more
 
 	// Initialize the database
 	db, err := database.NewDBInterface()
