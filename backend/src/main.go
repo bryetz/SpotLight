@@ -19,7 +19,10 @@ const portNum = ":8080"
 func main() {
 	log.Println("Starting the API backend...")
 
-	// Initialize the database connection
+	fm := database.NewFileManager()
+	fm.TestFunc() // only here to show it is 'used' but will remove once we incorporate it more
+
+	// Initialize the database
 	db, err := database.NewDBInterface()
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
