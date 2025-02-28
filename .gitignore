@@ -3,4 +3,3 @@ backend/.env
 .vs/
 backend/*.exe
 backend/*.bat
-.env

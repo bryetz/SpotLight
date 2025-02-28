@@ -2,36 +2,27 @@ package backend_test
 
 import (
 	"SpotLight/backend/src/database"
+	"SpotLight/backend/src/handler"
 	"bytes"
 	"encoding/json"
-	"github.com/joho/godotenv"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 )
 
 // setupTestDB initializes the test database connection
 func setupTestDB(t *testing.T) (*database.DBInterface, *bool) {
-	// Load .env manually before initializing the database
-	err := godotenv.Load()
-	if err != nil {
-		t.Log("Warning: .env file not found. Using system environment variables.")
-	}
-
-	// Initialize database connection
 	db, err := database.NewDBInterface()
 	if err != nil {
 		t.Fatalf("Failed to initialize database: %v", err)
 	}
-
-	// Track if the test created the user
 	userCreated := false
-
 	return db, &userCreated
 }
 
-// cleanupTestData removes test users **at the end of each test**
+// cleanupTestData removes test users at the end of each test
 func cleanupTestData(db *database.DBInterface, userCreated *bool, t *testing.T) {
 	if *userCreated {
 		err := db.DeleteUser("testUser")
@@ -47,12 +38,13 @@ func TestRegisterEndpoint(t *testing.T) {
 	defer db.Close()
 	defer cleanupTestData(db, userCreated, t)
 
-	requestBody := `{"username":"testUser","password":"password"}`
-	req := httptest.NewRequest("POST", "/api/register", strings.NewReader(requestBody))
+	reqBody := `{"username":"testUser","password":"password"}`
+	req := httptest.NewRequest("POST", "/api/register", strings.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
-	db.HandleRegister(rec, req)
+	handlerInstance := handler.RequestHandler{DB: db}
+	handlerInstance.HandleRegister(rec, req)
 
 	if rec.Code != http.StatusCreated {
 		t.Errorf("Expected status 201, got %d", rec.Code)
@@ -72,15 +64,28 @@ func TestLoginEndpoint(t *testing.T) {
 	}
 	*userCreated = true
 
-	requestBody := `{"username":"testUser","password":"password"}`
-	req := httptest.NewRequest("POST", "/api/login", strings.NewReader(requestBody))
+	reqBody := `{"username":"testUser","password":"password"}`
+	req := httptest.NewRequest("POST", "/api/login", strings.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
-	db.HandleLogin(rec, req)
+	handlerInstance := handler.RequestHandler{DB: db}
+	handlerInstance.HandleLogin(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", rec.Code)
+	}
+
+	// Decode response body
+	var responseData map[string]interface{}
+	err := json.NewDecoder(rec.Body).Decode(&responseData)
+	if err != nil {
+		t.Fatalf("Failed to decode response JSON: %v", err)
+	}
+
+	// Validate response contains user_id
+	if _, ok := responseData["user_id"]; !ok {
+		t.Fatalf("Login response missing 'user_id'")
 	}
 }
 
@@ -95,11 +100,15 @@ func TestCreatePostEndpoint(t *testing.T) {
 	}
 	*userCreated = true
 
-	if err := db.Login("testUser", "password"); err != nil {
+	// Authenticate and retrieve user ID
+	userID, err := db.Authenticate("testUser", "password")
+	if err != nil {
 		t.Fatalf("Failed to log in: %v", err)
 	}
 
+	// Prepare post request
 	postBody, err := json.Marshal(map[string]interface{}{
+		"user_id":   userID,
 		"content":   "Hello, API!",
 		"latitude":  37.7749,
 		"longitude": -122.4194,
@@ -112,7 +121,8 @@ func TestCreatePostEndpoint(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
-	db.HandlePosts(rec, req)
+	handlerInstance := handler.RequestHandler{DB: db}
+	handlerInstance.HandleCreatePost(rec, req)
 
 	if rec.Code != http.StatusCreated {
 		t.Errorf("Expected status 201, got %d", rec.Code)
@@ -128,15 +138,133 @@ func TestGetPostsEndpoint(t *testing.T) {
 	req := httptest.NewRequest("GET", "/api/posts", nil)
 	rec := httptest.NewRecorder()
 
-	db.HandlePosts(rec, req)
+	handlerInstance := handler.RequestHandler{DB: db}
+	handlerInstance.HandleGetPosts(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Errorf("Expected status 200, got %d", rec.Code)
 	}
 
+	// Validate JSON response
 	var posts []map[string]interface{}
 	err := json.NewDecoder(rec.Body).Decode(&posts)
 	if err != nil {
 		t.Fatalf("Failed to decode response JSON: %v", err)
+	}
+}
+
+// TestDeleteUserEndpoint verifies user deletion via API
+func TestDeleteUserEndpoint(t *testing.T) {
+	db, userCreated := setupTestDB(t)
+	defer db.Close()
+	defer cleanupTestData(db, userCreated, t)
+
+	if err := db.Register("testUser", "password"); err != nil {
+		t.Fatalf("Failed to register user: %v", err)
+	}
+	*userCreated = true
+
+	// Send DELETE request to API
+	reqBody, _ := json.Marshal(map[string]string{"username": "testUser"})
+	req := httptest.NewRequest("DELETE", "/api/delete-user", bytes.NewBuffer(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handlerInstance := handler.RequestHandler{DB: db}
+	handlerInstance.HandleDeleteUser(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", rec.Code)
+	}
+
+	*userCreated = false
+
+	// Verify user deletion by trying to log in again
+	if _, err := db.Authenticate("testUser", "password"); err == nil {
+		t.Fatalf("User should have been deleted but can still log in")
+	}
+}
+
+func TestDeletePostEndpoint(t *testing.T) {
+	db, userCreated := setupTestDB(t)
+	defer db.Close()
+	defer cleanupTestData(db, userCreated, t)
+
+	// Step 1: Register test user
+	if err := db.Register("testUser", "password"); err != nil {
+		t.Fatalf("Failed to register user: %v", err)
+	}
+	*userCreated = true
+
+	// Step 2: Authenticate and get user ID
+	userID, err := db.Authenticate("testUser", "password")
+	if err != nil {
+		t.Fatalf("Failed to log in: %v", err)
+	}
+
+	// Step 3: Create a post
+	postBody, err := json.Marshal(map[string]interface{}{
+		"user_id":   userID,
+		"content":   "Test post for deletion",
+		"latitude":  37.7749,
+		"longitude": -122.4194,
+	})
+	if err != nil {
+		t.Fatalf("Failed to marshal JSON: %v", err)
+	}
+
+	postReq := httptest.NewRequest("POST", "/api/posts", bytes.NewBuffer(postBody))
+	postReq.Header.Set("Content-Type", "application/json")
+	postRec := httptest.NewRecorder()
+
+	handlerInstance := handler.RequestHandler{DB: db}
+	handlerInstance.HandleCreatePost(postRec, postReq)
+
+	if postRec.Code != http.StatusCreated {
+		t.Fatalf("Expected post creation status 201, got %d", postRec.Code)
+	}
+
+	// Step 4: Retrieve posts to get the ID of the newly created post
+	getReq := httptest.NewRequest("GET", "/api/posts", nil)
+	getRec := httptest.NewRecorder()
+	handlerInstance.HandleGetPosts(getRec, getReq)
+
+	var posts []map[string]interface{}
+	err = json.NewDecoder(getRec.Body).Decode(&posts)
+	if err != nil {
+		t.Fatalf("Failed to decode posts JSON: %v", err)
+	}
+
+	if len(posts) == 0 {
+		t.Fatalf("Expected at least one post but got none")
+	}
+
+	// Get the post_id of the most recent post
+	postID := int(posts[0]["post_id"].(float64)) // Convert from float64
+	print("post:", postID)
+
+	// Step 5: Delete the post using the retrieved post ID
+	deleteReq := httptest.NewRequest("DELETE", "/api/posts/"+strconv.Itoa(postID), nil)
+	deleteRec := httptest.NewRecorder()
+	handlerInstance.HandleDeletePost(deleteRec, deleteReq)
+
+	if deleteRec.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", deleteRec.Code)
+	}
+
+	// Step 6: Verify the post is deleted
+	getRec = httptest.NewRecorder()
+	handlerInstance.HandleGetPosts(getRec, getReq)
+
+	err = json.NewDecoder(getRec.Body).Decode(&posts)
+	if err != nil {
+		t.Fatalf("Failed to decode posts JSON after deletion: %v", err)
+	}
+
+	// Ensure the deleted post is no longer present
+	for _, post := range posts {
+		if int(post["post_id"].(float64)) == postID {
+			t.Fatalf("Post was not deleted correctly, still exists in the database")
+		}
 	}
 }
