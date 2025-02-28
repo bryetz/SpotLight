@@ -5,6 +5,7 @@ import (
 	"SpotLight/backend/src/handler"
 	"bytes"
 	"encoding/json"
+	"github.com/gorilla/mux"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -190,24 +191,24 @@ func TestDeletePostEndpoint(t *testing.T) {
 	defer db.Close()
 	defer cleanupTestData(db, userCreated, t)
 
-	// Step 1: Register test user
+	// Register test user
 	if err := db.Register("testUser", "password"); err != nil {
 		t.Fatalf("Failed to register user: %v", err)
 	}
 	*userCreated = true
 
-	// Step 2: Authenticate and get user ID
+	// Authenticate and get user ID
 	userID, err := db.Authenticate("testUser", "password")
 	if err != nil {
 		t.Fatalf("Failed to log in: %v", err)
 	}
 
-	// Step 3: Create a post
+	// Create a post
 	postBody, err := json.Marshal(map[string]interface{}{
 		"user_id":   userID,
 		"content":   "Test post for deletion",
-		"latitude":  37.7749,
-		"longitude": -122.4194,
+		"latitude":  0,
+		"longitude": 0,
 	})
 	if err != nil {
 		t.Fatalf("Failed to marshal JSON: %v", err)
@@ -224,7 +225,7 @@ func TestDeletePostEndpoint(t *testing.T) {
 		t.Fatalf("Expected post creation status 201, got %d", postRec.Code)
 	}
 
-	// Step 4: Retrieve posts to get the ID of the newly created post
+	// Retrieve posts to get the ID of the newly created post
 	getReq := httptest.NewRequest("GET", "/api/posts", nil)
 	getRec := httptest.NewRecorder()
 	handlerInstance.HandleGetPosts(getRec, getReq)
@@ -241,30 +242,34 @@ func TestDeletePostEndpoint(t *testing.T) {
 
 	// Get the post_id of the most recent post
 	postID := int(posts[0]["post_id"].(float64)) // Convert from float64
-	print("post:", postID)
+	t.Logf("Post created with ID: %d", postID)
 
-	// Step 5: Delete the post using the retrieved post ID
 	deleteReq := httptest.NewRequest("DELETE", "/api/posts/"+strconv.Itoa(postID), nil)
+	deleteReq = mux.SetURLVars(deleteReq, map[string]string{"id": strconv.Itoa(postID)})
 	deleteRec := httptest.NewRecorder()
+
 	handlerInstance.HandleDeletePost(deleteRec, deleteReq)
 
 	if deleteRec.Code != http.StatusOK {
-		t.Errorf("Expected status 200, got %d", deleteRec.Code)
+		t.Fatalf("Expected status 200 for deletion, got %d", deleteRec.Code)
 	}
 
-	// Step 6: Verify the post is deleted
-	getRec = httptest.NewRecorder()
-	handlerInstance.HandleGetPosts(getRec, getReq)
+	// Verify the post is deleted by fetching posts again
+	getReqAfterDelete := httptest.NewRequest("GET", "/api/posts", nil)
+	getRecAfterDelete := httptest.NewRecorder()
+	handlerInstance.HandleGetPosts(getRecAfterDelete, getReqAfterDelete)
 
-	err = json.NewDecoder(getRec.Body).Decode(&posts)
+	var postsAfterDelete []map[string]interface{}
+	err = json.NewDecoder(getRecAfterDelete.Body).Decode(&postsAfterDelete)
 	if err != nil {
 		t.Fatalf("Failed to decode posts JSON after deletion: %v", err)
 	}
 
 	// Ensure the deleted post is no longer present
-	for _, post := range posts {
+	for _, post := range postsAfterDelete {
 		if int(post["post_id"].(float64)) == postID {
 			t.Fatalf("Post was not deleted correctly, still exists in the database")
 		}
 	}
+	t.Log("Post successfully deleted")
 }
