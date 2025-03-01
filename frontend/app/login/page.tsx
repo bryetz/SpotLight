@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { login, register } from '@/app/lib/api';
-import { useAuth } from '@/app/hooks/useAuth';
+import { login, register } from '@/services/api';
+import { useAuth } from '@/hooks/useAuth';
 
 type AuthMode = 'login' | 'register';
 

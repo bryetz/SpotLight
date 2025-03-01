@@ -1,4 +1,4 @@
-import { getPosts } from '@/app/lib/api';
+import { getPosts } from '@/services/api';
 
 async function fetchPosts() {
   try {
