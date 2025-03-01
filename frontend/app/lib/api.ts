@@ -8,7 +8,7 @@ const api = axios.create({
   },
 });
 
-
+// async helper function to get location
 function getCurrentLocation(): Promise<{ latitude: number; longitude: number }> {
   return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {

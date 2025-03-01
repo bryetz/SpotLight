@@ -6,12 +6,10 @@ import (
 	"log"
 	"math"
 	"os"
-	"strconv"
 	"time"
 
-	"github.com/joho/godotenv"
-
 	"github.com/jackc/pgx/v4"
+	"github.com/joho/godotenv"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -128,7 +126,7 @@ func (db *DBInterface) GetPosts(reqLatitude float64, reqLongitude float64, dista
 	if distance < 0 {
 		distance = 25000 // arbitrary cutoff distance in meters, 25km
 	}
-	fmt.Println("queried with: " + strconv.FormatFloat(reqLatitude, 'f', -1, 64) + ", " + strconv.FormatFloat(reqLongitude, 'f', -1, 64) + ", " + strconv.FormatInt(int64(distance), 10))
+	// fmt.Println("queried with: " + strconv.FormatFloat(reqLatitude, 'f', -1, 64) + ", " + strconv.FormatFloat(reqLongitude, 'f', -1, 64) + ", " + strconv.FormatInt(int64(distance), 10))
 
 	if math.IsInf(reqLatitude, 1) || math.IsInf(reqLongitude, 1) {
 		getQuery = `SELECT p.id, u.username, p.content, p.latitude, p.longitude, p.created_at
@@ -186,7 +184,7 @@ func (db *DBInterface) GetPosts(reqLatitude float64, reqLongitude float64, dista
 			"created_at": createdAt.Format(time.RFC3339),
 		})
 	}
-	fmt.Println(posts)
+	// fmt.Println(posts)
 	return posts, nil
 }
 
