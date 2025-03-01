@@ -2,10 +2,14 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
+	"math"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"SpotLight/backend/src/database"
+
 	"github.com/gorilla/mux"
 )
 
@@ -140,7 +144,39 @@ func (h *RequestHandler) HandleCreatePost(w http.ResponseWriter, r *http.Request
 
 // HandleGetPosts retrieves all posts
 func (h *RequestHandler) HandleGetPosts(w http.ResponseWriter, r *http.Request) {
-	posts, err := h.DB.GetPosts()
+	// parse url
+	//fmt.Println(r.RequestURI)
+	parsedURL, err := url.Parse(r.RequestURI)
+	if err != nil {
+		fmt.Println("Error parsing URL:", err)
+		return
+	}
+
+	// get params from parsed header in get request
+	params := parsedURL.Query()
+
+	// Extract specific parameters
+	latitude, err := strconv.ParseFloat(params.Get("latitude"), 64)
+	if err != nil {
+		latitude = math.Inf(1)
+		fmt.Println("Error converting latitude to float:", err)
+	}
+
+	longitude, err := strconv.ParseFloat(params.Get("longitude"), 64)
+	if err != nil {
+		longitude = math.Inf(1)
+		fmt.Println("Error converting longitude to float:", err)
+	}
+
+	distance, err := strconv.Atoi(params.Get("distance"))
+	if err != nil {
+		distance = -1
+		fmt.Println("Error converting distance to int:", err)
+	}
+	// if long/lat is out of range of -90 to 90 and -180 to 180 respectively, show all posts regardless
+	// negative distance defaults to regular distance 15km
+
+	posts, err := h.DB.GetPosts(latitude, longitude, distance)
 	if err != nil {
 		http.Error(w, `{"message": "Failed to retrieve posts"}`, http.StatusInternalServerError)
 		return
