@@ -14,7 +14,7 @@ export const login = (username: string, password: string) =>
 export const register = (username: string, password: string) => 
   api.post('/api/register', { username, password });
 export const createPost = (data: { 
-  // user_id: number, 
+  user_id: number,
   content: string, 
   latitude: number, 
   longitude: number 
