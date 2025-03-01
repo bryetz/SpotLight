@@ -9,7 +9,6 @@ import (
 	"strconv"
 
 	"SpotLight/backend/src/database"
-
 	"github.com/gorilla/mux"
 )
 
