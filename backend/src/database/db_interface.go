@@ -3,12 +3,13 @@ package database
 import (
 	"context"
 	"fmt"
-	"github.com/joho/godotenv"
 	"log"
+	"math"
 	"os"
 	"time"
 
 	"github.com/jackc/pgx/v4"
+	"github.com/joho/godotenv"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -114,13 +115,53 @@ func (db *DBInterface) CreatePost(userID int, content string, latitude, longitud
 }
 
 // GetPosts retrieves all posts
-func (db *DBInterface) GetPosts() ([]map[string]interface{}, error) {
-	rows, err := db.conn.Query(context.Background(),
-		"SELECT p.id, u.username, p.content, p.latitude, p.longitude, p.created_at FROM posts p JOIN users u ON p.user_id = u.id ORDER BY p.created_at DESC")
+func (db *DBInterface) GetPosts(reqLatitude float64, reqLongitude float64, distance int) ([]map[string]interface{}, error) {
+	// JOIN posts with users to get usernames
+	// until we get data from the request body specifying both location of request and distance perferred,
+	// we will arbitrarily compare server location and not show posts beyond 25 kilometers
+	// the query is based on the Haversine formula to approx earth as a sphere instead of ellipse
+	// reqLatitude = 0
+	// reqLongitude = 0
+	var getQuery string = ""
+	if distance < 0 {
+		distance = 25000 // arbitrary cutoff distance in meters, 25km
+	}
+	// fmt.Println("queried with: " + strconv.FormatFloat(reqLatitude, 'f', -1, 64) + ", " + strconv.FormatFloat(reqLongitude, 'f', -1, 64) + ", " + strconv.FormatInt(int64(distance), 10))
+
+	if math.IsInf(reqLatitude, 1) || math.IsInf(reqLongitude, 1) {
+		getQuery = `SELECT p.id, u.username, p.content, p.latitude, p.longitude, p.created_at
+			FROM posts p
+			JOIN users u ON p.user_id = u.id
+			ORDER BY p.created_at DESC;`
+	} else {
+		getQuery = fmt.Sprintf(`
+			SELECT p.id, u.username, p.content, p.latitude, p.longitude, p.created_at
+			FROM posts p
+			JOIN users u ON p.user_id = u.id
+			WHERE ( 6371000 * acos(
+					cos(radians(%f)) * cos(radians(p.latitude)) *
+					cos(radians(p.longitude) - radians(%f)) +
+					sin(radians(%f)) * sin(radians(p.latitude))
+				) ) < %d
+			ORDER BY p.created_at DESC;`, reqLatitude, reqLongitude, reqLatitude, distance)
+	}
+	// fmt.Println(getQuery)
+
+	rows, err := db.conn.Query(context.Background(), getQuery)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve posts: %w", err)
 	}
 	defer rows.Close()
+
+	/* // feel free to add this as an additional column in the response to show how far the post is from the user!
+	( 6371000 * acos(
+		cos(radians(%f)) * cos(radians(p.latitude)) *
+		cos(radians(p.longitude) - radians(%f)) +
+		sin(radians(%f)) * sin(radians(p.latitude))
+	) ) AS distance_meters
+	*/
+	// also could order by smallest distance assuming we incorporate above
+	// ORDER BY distance_meters ASC, p.created_at DESC;
 
 	var posts []map[string]interface{}
 	for rows.Next() {
@@ -143,7 +184,7 @@ func (db *DBInterface) GetPosts() ([]map[string]interface{}, error) {
 			"created_at": createdAt.Format(time.RFC3339),
 		})
 	}
-
+	// fmt.Println(posts)
 	return posts, nil
 }
 
