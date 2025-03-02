@@ -1,28 +1,40 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Slider } from '@/components/shadcn/ui/slider'
-import { formatDistance, sliderValueToRadius, radiusToSliderValue } from '@/lib/shadcn/utils'
+import { formatDistance, sliderValueToRadius, radiusToSliderValue } from '@/lib/slider_functions'
 import { MapPin } from 'lucide-react'
 
 interface RadiusFilterProps {
   initialRadius?: number
+  minRadius?: number
+  maxRadius?: number
   onRadiusChange: (radius: number) => void
 }
 
-export function RadiusFilter({ initialRadius = 25000, onRadiusChange }: RadiusFilterProps) {
+export function RadiusFilter({ 
+  initialRadius = 25000, 
+  minRadius = 500, 
+  maxRadius = 50000, 
+  onRadiusChange 
+}: RadiusFilterProps) {
   // Convert the initial radius to a slider value (0-100)
-  const initialSliderValue = radiusToSliderValue(initialRadius)
+  const initialSliderValue = radiusToSliderValue(initialRadius, minRadius, maxRadius)
   
   const [sliderValue, setSliderValue] = useState<number>(initialSliderValue)
   const [radius, setRadius] = useState<number>(initialRadius)
   
-  // Update radius when slider changes
+  // Update local state when slider changes (no API call)
   const handleSliderChange = (value: number[]) => {
     const newValue = value[0]
     setSliderValue(newValue)
-    const newRadius = sliderValueToRadius(newValue)
+    const newRadius = sliderValueToRadius(newValue, minRadius, maxRadius)
     setRadius(newRadius)
+  }
+  
+  // Only call the API when slider interaction ends
+  const handleSliderCommit = (value: number[]) => {
+    const newRadius = sliderValueToRadius(value[0], minRadius, maxRadius)
     onRadiusChange(newRadius)
   }
   
@@ -42,12 +54,13 @@ export function RadiusFilter({ initialRadius = 25000, onRadiusChange }: RadiusFi
         max={100}
         step={1}
         onValueChange={handleSliderChange}
+        onValueCommit={handleSliderCommit}
         className="my-4"
       />
       
       <div className="flex justify-between text-xs text-[#818384]">
-        <span>500m</span>
-        <span>50km</span>
+        <span>{formatDistance(minRadius)}</span>
+        <span>{formatDistance(maxRadius)}</span>
       </div>
     </div>
   )

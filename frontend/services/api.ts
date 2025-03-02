@@ -37,8 +37,8 @@ function getCurrentLocation(): Promise<{ latitude: number; longitude: number }> 
 }
 
 // Auth endpoints
-export const login = (email: string, password: string) => 
-  api.post('/api/login', { email, password });
+export const login = (username: string, password: string) => 
+  api.post('/api/login', { username, password });
 
 export const register = (username: string, password: string) => 
   api.post('/api/register', { username, password });
@@ -70,10 +70,11 @@ export const getPosts = async (params?: {
     const { latitude, longitude } = await getCurrentLocation();
     reqLatitude = latitude;
     reqLongitude = longitude;
+    console.log(`/api/posts?latitude=${reqLatitude}&longitude=${reqLongitude}&distance=${distance}`);
     return api.get(`/api/posts?latitude=${reqLatitude}&longitude=${reqLongitude}&distance=${distance}`)
   } catch (error) {
     console.error(error);
-    return api.get(`/api/posts?latitude=${reqLatitude}&longitude=${reqLongitude}&distan=${distance}`)
+    return api.get(`/api/posts?latitude=${reqLatitude}&longitude=${reqLongitude}&distance=${distance}`)
   }
 
   // example test, (26.062, -80.3368) versus (29.5, -82.3368)
