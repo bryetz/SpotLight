@@ -39,7 +39,7 @@ export function RadiusFilter({
   }
   
   return (
-    <div className="bg-black/20 backdrop-blur-[4px] border border-[#343536] rounded-lg p-4 mb-4">
+    <div data-testid="radius-filter" className="bg-black/20 backdrop-blur-[4px] border border-[#343536] rounded-lg p-4 mb-4">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center">
           <MapPin className="w-4 h-4 mr-2 text-[#818384]" />
