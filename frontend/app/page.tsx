@@ -1,6 +1,6 @@
 'use client';
 
-import { Feed } from '@/app/components/features/Feed';
+import { Feed } from '@/components/features/Feed';
 
 export default function Home() {
   return (

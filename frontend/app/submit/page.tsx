@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/app/hooks/useAuth';
-import { createPost } from '@/app/lib/api';
+import { useAuth } from '@/hooks/useAuth';
+import { createPost } from '@/services/api';
 import { MapPin } from 'lucide-react';
 
 interface Location {

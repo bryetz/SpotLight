@@ -1,4 +1,4 @@
-import { Post } from '@/app/types/post';
+import { Post } from '@/types/post';
 import { MapPin, MessageCircle, Heart, Share2 } from 'lucide-react';
 import { useState } from 'react';
 

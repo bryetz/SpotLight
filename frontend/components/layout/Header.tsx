@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
-import { useAuth } from '@/app/hooks/useAuth';
+import { useAuth } from '@/hooks/useAuth';
 import { User, ChevronDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
