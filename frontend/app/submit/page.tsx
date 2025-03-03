@@ -25,6 +25,7 @@ export default function SubmitPage() {
   useEffect(() => {
     // Redirect if user is not authenticated or userId is missing
     if (!isAuthenticated || !userId) {
+      console.log('Redirecting to login. Why?: ', isAuthenticated, userId);
       router.push('/login');
       return;
     }
@@ -143,10 +144,10 @@ export default function SubmitPage() {
                     <div className="flex items-center text-sm text-white">
                       <MapPin className="w-4 h-4 mr-2 text-[#818384]" />
                       <span className="font-medium">
-                    {location.city}{location.state ? `, ${location.state}` : ''}
-                  </span>
+                        {location.city}{location.state ? `, ${location.state}` : ''}
+                      </span>
                     </div>
-                    <div className="text-xs text-[#818384] ml-6">
+                    <div data-testid="location-coordinates" className="text-xs text-[#818384] ml-6">
                       {location.lat.toFixed(6)}, {location.lon.toFixed(6)}
                     </div>
                   </div>

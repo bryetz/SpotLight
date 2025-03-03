@@ -7,15 +7,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { login } = useAuth();
 
   useEffect(() => {
-    // Check for existing auth token on mount
-    const token = localStorage.getItem('authToken');
-    const storedUsername = localStorage.getItem('username');
+    // Check for existing auth on mount
     const userId = localStorage.getItem('userId');
+    const username = localStorage.getItem('username');
     
-    if (token && storedUsername && userId) {
-      login(storedUsername, token, parseInt(userId));
+    if (userId && username) {
+      login(username, parseInt(userId, 10));
     }
-  }, []);
+  }, [login]);
 
   return <>{children}</>;
-} 
+}
