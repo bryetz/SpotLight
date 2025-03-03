@@ -116,6 +116,9 @@ func (db *DBInterface) CreatePost(userID int, content string, latitude, longitud
 
 // GetPosts retrieves all posts
 func (db *DBInterface) GetPosts(reqLatitude float64, reqLongitude float64, distance int) ([]map[string]interface{}, error) {
+	// Add input parameter logging
+	fmt.Printf("GetPosts called with: lat=%f, lng=%f, distance=%d meters\n", reqLatitude, reqLongitude, distance)
+	
 	// JOIN posts with users to get usernames
 	// until we get data from the request body specifying both location of request and distance perferred,
 	// we will arbitrarily compare server location and not show posts beyond 25 kilometers
@@ -125,10 +128,12 @@ func (db *DBInterface) GetPosts(reqLatitude float64, reqLongitude float64, dista
 	var getQuery string = ""
 	if distance < 0 {
 		distance = 25000 // arbitrary cutoff distance in meters, 25km
+		fmt.Println("Negative distance provided, using default 25000m instead")
 	}
 	// fmt.Println("queried with: " + strconv.FormatFloat(reqLatitude, 'f', -1, 64) + ", " + strconv.FormatFloat(reqLongitude, 'f', -1, 64) + ", " + strconv.FormatInt(int64(distance), 10))
 
 	if math.IsInf(reqLatitude, 1) || math.IsInf(reqLongitude, 1) {
+		fmt.Println("Infinite coordinates detected, using simple query without distance filtering")
 		getQuery = `SELECT p.id, u.username, p.content, p.latitude, p.longitude, p.created_at
 			FROM posts p
 			JOIN users u ON p.user_id = u.id
@@ -145,8 +150,9 @@ func (db *DBInterface) GetPosts(reqLatitude float64, reqLongitude float64, dista
 				) ) < %d
 			ORDER BY p.created_at DESC;`, reqLatitude, reqLongitude, reqLatitude, distance)
 	}
-	// fmt.Println(getQuery)
-
+	
+	//fmt.Println("Executing query:", getQuery)
+	
 	rows, err := db.conn.Query(context.Background(), getQuery)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve posts: %w", err)

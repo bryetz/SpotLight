@@ -13,7 +13,7 @@ interface AuthState {
 
 export const useAuth = create<AuthState>()(
     persist(
-        (set) => ({
+        (set, get) => ({
             isAuthenticated: false,
             username: null,
             userId: null,
@@ -25,6 +25,9 @@ export const useAuth = create<AuthState>()(
                 }
 
                 set({ isAuthenticated: true, username, userId });
+                
+                // Log state after login
+                console.log(`State after login - isAuthenticated: ${get().isAuthenticated}, username: ${get().username}, userId: ${get().userId}`);
             },
             logout: () => {
                 console.log('Logout called');
@@ -34,6 +37,9 @@ export const useAuth = create<AuthState>()(
                 }
 
                 set({ isAuthenticated: false, username: null, userId: null });
+
+                // Log state after logout
+                console.log(`State after logout - isAuthenticated: ${get().isAuthenticated}, username: ${get().username}, userId: ${get().userId}`);
             },
         }),
         {

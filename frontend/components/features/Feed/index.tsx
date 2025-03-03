@@ -68,14 +68,16 @@ export function Feed() {
       
       {showFilters && (
         <RadiusFilter 
-          initialRadius={radius} 
+          initialRadius={radius}
+          minRadius={1000} // Set your desired minimum (e.g., 1km)
+          maxRadius={50000} // Set your desired maximum (e.g., 50km)
           onRadiusChange={handleRadiusChange} 
         />
       )}
       
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-6 h-6 text-white animate-spin" />
+          <Loader2 data-testid="loader-icon" className="w-6 h-6 text-white animate-spin" />
         </div>
       ) : posts.length === 0 ? (
         <div className="bg-black/20 backdrop-blur-[4px] border border-[#343536] rounded-lg p-6">
