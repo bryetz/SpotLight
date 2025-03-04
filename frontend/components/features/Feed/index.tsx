@@ -66,14 +66,13 @@ export function Feed() {
         </button>
       </div>
       
-      {showFilters && (
-        <RadiusFilter 
-          initialRadius={radius}
-          minRadius={1000} // Set your desired minimum (e.g., 1km)
-          maxRadius={50000} // Set your desired maximum (e.g., 50km)
-          onRadiusChange={handleRadiusChange} 
-        />
-      )}
+      <RadiusFilter 
+        initialRadius={radius}
+        minRadius={1000}
+        maxRadius={50000}
+        onRadiusChange={handleRadiusChange}
+        isOpen={showFilters}
+      />
       
       {isLoading ? (
         <div className="flex items-center justify-center py-12">

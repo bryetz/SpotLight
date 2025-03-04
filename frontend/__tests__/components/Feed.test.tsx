@@ -41,7 +41,7 @@ jest.mock('@/services/api', () => ({
   getPosts: jest.fn()
 }));
 
-describe('Feed Component', () => {
+describe('TestFeed', () => {
   // Sample post data for testing
   const mockPosts = [
     {

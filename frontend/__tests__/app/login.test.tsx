@@ -22,7 +22,7 @@ jest.mock('@/hooks/useAuth', () => ({
   useAuth: jest.fn()
 }));
 
-describe('LoginPage Component', () => {
+describe('TestLoginPage', () => {
   // Set up mock implementations
   const mockPush = jest.fn();
   const mockRefresh = jest.fn();

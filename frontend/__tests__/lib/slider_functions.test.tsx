@@ -1,7 +1,7 @@
 // slider_functions.test.ts
 import { formatDistance, sliderValueToRadius, radiusToSliderValue } from '@/lib/slider_functions';
 
-describe('Slider Utility Functions', () => {
+describe('TestSliderFunctions', () => {
   test('formatDistance formats meters correctly', () => {
     expect(formatDistance(500)).toBe('500m');
     expect(formatDistance(1500)).toBe('1.5km');

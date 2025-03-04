@@ -11,7 +11,7 @@ jest.mock('lucide-react', () => ({
   Share2: () => <div data-testid="share-icon">Share</div>
 }));
 
-describe('PostCard Component', () => {
+describe('TestPostCard', () => {
   // Sample post data for testing
   const mockPost = {
     post_id: 123,

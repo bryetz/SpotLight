@@ -26,7 +26,7 @@ jest.mock('lucide-react', () => ({
   MapPin: () => <div data-testid="map-pin-icon">Location</div>
 }));
 
-describe('SubmitPage Component', () => {
+describe('TestSubmitPage', () => {
   // Set up mock implementations
   const mockPush = jest.fn();
   const mockBack = jest.fn();
