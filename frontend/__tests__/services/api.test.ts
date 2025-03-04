@@ -45,7 +45,7 @@ Object.defineProperty(global, 'navigator', {
 // Import the API function after all mocks are set up
 import { getPosts } from '@/services/api';
 
-describe('getPosts API Function', () => {
+describe('TestAPI', () => {
   // Get a reference to our mocked axios instance
   const mockAxios = require('axios').create();
   

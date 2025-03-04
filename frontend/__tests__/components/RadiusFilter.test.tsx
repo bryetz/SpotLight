@@ -31,7 +31,7 @@ jest.mock('@/lib/slider_functions', () => ({
 // Import the component after mocking its dependencies
 import { RadiusFilter } from '@/components/features/Feed/RadiusFilter';
 
-describe('RadiusFilter Component', () => {
+describe('TestRadiusFilter', () => {
   // Basic rendering test
   test('renders the component', () => {
     const mockOnRadiusChange = jest.fn();
