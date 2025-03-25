@@ -170,3 +170,63 @@ func (h *RequestHandler) HandleDeletePost(w http.ResponseWriter, r *http.Request
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Post deleted successfully"})
 }
+
+func (h *RequestHandler) HandleLikePost(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		UserID int `json:"user_id"`
+		PostID int `json:"post_id"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"message": "Invalid request payload"}`, http.StatusBadRequest)
+		return
+	}
+
+	if err := h.DB.LikePost(req.UserID, req.PostID); err != nil {
+		http.Error(w, `{"message": "`+err.Error()+`"}`, http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Post liked successfully"})
+}
+
+func (h *RequestHandler) HandleGetPostLikes(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	postID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		http.Error(w, `{"message": "Invalid post ID"}`, http.StatusBadRequest)
+		return
+	}
+
+	usernames, err := h.DB.GetPostLikes(postID)
+	if err != nil {
+		http.Error(w, `{"message": "Failed to retrieve likes"}`, http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"post_id":   postID,
+		"usernames": usernames,
+	})
+}
+
+func (h *RequestHandler) HandleUnlikePost(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		UserID int `json:"user_id"`
+		PostID int `json:"post_id"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"message": "Invalid request payload"}`, http.StatusBadRequest)
+		return
+	}
+
+	if err := h.DB.UnlikePost(req.UserID, req.PostID); err != nil {
+		http.Error(w, `{"message": "`+err.Error()+`"}`, http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Post unliked successfully"})
+}
