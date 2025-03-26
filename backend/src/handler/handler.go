@@ -286,10 +286,11 @@ func (h *RequestHandler) HandleCreateComment(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"message": "Comment posted"})
 }
 
+// HandleDeleteComment deletes a comment and its nested replies
 func (h *RequestHandler) HandleDeleteComment(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	commentID, err := strconv.Atoi(vars["id"])
@@ -303,5 +304,6 @@ func (h *RequestHandler) HandleDeleteComment(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"message": "Comment deleted"})
 }

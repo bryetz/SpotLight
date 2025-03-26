@@ -45,13 +45,13 @@ func TestCreateTopLevelComment(t *testing.T) {
 	defer cleanupTestData(db, userCreated, t)
 
 	comment := map[string]interface{}{
-		"post_id": postID,
 		"user_id": userID,
 		"content": "Top-level comment",
 	}
 	jsonBody, _ := json.Marshal(comment)
 
-	req := httptest.NewRequest("POST", "/api/comments", bytes.NewBuffer(jsonBody))
+	req := httptest.NewRequest("POST", "/api/posts/"+strconv.Itoa(postID)+"/comments", bytes.NewBuffer(jsonBody))
+	req = mux.SetURLVars(req, map[string]string{"id": strconv.Itoa(postID)})
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
@@ -69,12 +69,12 @@ func TestCreateReplyComment(t *testing.T) {
 
 	// Create top-level comment
 	top := map[string]interface{}{
-		"post_id": postID,
 		"user_id": userID,
 		"content": "Parent comment",
 	}
 	topJSON, _ := json.Marshal(top)
-	topReq := httptest.NewRequest("POST", "/api/comments", bytes.NewBuffer(topJSON))
+	topReq := httptest.NewRequest("POST", "/api/posts/"+strconv.Itoa(postID)+"/comments", bytes.NewBuffer(topJSON))
+	topReq = mux.SetURLVars(topReq, map[string]string{"id": strconv.Itoa(postID)})
 	topReq.Header.Set("Content-Type", "application/json")
 	topRec := httptest.NewRecorder()
 	h.HandleCreateComment(topRec, topReq)
@@ -91,13 +91,13 @@ func TestCreateReplyComment(t *testing.T) {
 
 	// Reply to top-level comment
 	reply := map[string]interface{}{
-		"post_id":   postID,
 		"user_id":   userID,
 		"content":   "Reply to comment",
 		"parent_id": parentID,
 	}
 	replyJSON, _ := json.Marshal(reply)
-	replyReq := httptest.NewRequest("POST", "/api/comments", bytes.NewBuffer(replyJSON))
+	replyReq := httptest.NewRequest("POST", "/api/posts/"+strconv.Itoa(postID)+"/comments", bytes.NewBuffer(replyJSON))
+	replyReq = mux.SetURLVars(replyReq, map[string]string{"id": strconv.Itoa(postID)})
 	replyReq.Header.Set("Content-Type", "application/json")
 	replyRec := httptest.NewRecorder()
 	h.HandleCreateComment(replyRec, replyReq)
