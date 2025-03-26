@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/joho/godotenv"
 	"log"
+	"math"
 	"os"
 	"time"
 
@@ -109,15 +110,35 @@ func (db *DBInterface) CreatePost(userID int, content string, latitude, longitud
 	if err != nil {
 		return fmt.Errorf("failed to create post: %w", err)
 	}
-
 	return nil
 }
 
-// GetPosts retrieves all posts
-func (db *DBInterface) GetPosts() ([]map[string]interface{}, error) {
-	rows, err := db.conn.Query(context.Background(),
-		"SELECT p.id, u.username, p.content, p.latitude, p.longitude, p.created_at, p.like_count FROM posts p JOIN users u ON p.user_id = u.id ORDER BY p.created_at DESC")
+// GetPosts retrieves posts within a given distance (meters)
+func (db *DBInterface) GetPosts(reqLatitude float64, reqLongitude float64, distance int) ([]map[string]interface{}, error) {
+	if distance < 0 {
+		distance = 25000
+	}
 
+	var query string
+	if math.IsInf(reqLatitude, 1) || math.IsInf(reqLongitude, 1) {
+		query = `SELECT p.id, u.username, p.content, p.latitude, p.longitude, p.created_at, p.like_count
+				 FROM posts p
+				 JOIN users u ON p.user_id = u.id
+				 ORDER BY p.created_at DESC;`
+	} else {
+		query = fmt.Sprintf(`
+			SELECT p.id, u.username, p.content, p.latitude, p.longitude, p.created_at, p.like_count
+			FROM posts p
+			JOIN users u ON p.user_id = u.id
+			WHERE ( 6371000 * acos(
+					cos(radians(%f)) * cos(radians(p.latitude)) *
+					cos(radians(p.longitude) - radians(%f)) +
+					sin(radians(%f)) * sin(radians(p.latitude))
+				) ) < %d
+			ORDER BY p.created_at DESC;`, reqLatitude, reqLongitude, reqLatitude, distance)
+	}
+
+	rows, err := db.conn.Query(context.Background(), query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve posts: %w", err)
 	}
@@ -145,7 +166,6 @@ func (db *DBInterface) GetPosts() ([]map[string]interface{}, error) {
 			"created_at": createdAt.Format(time.RFC3339),
 			"like_count": likeCount,
 		})
-
 	}
 
 	return posts, nil
@@ -157,12 +177,11 @@ func (db *DBInterface) DeletePost(postID int) error {
 	if err != nil {
 		return fmt.Errorf("failed to delete post ID %d: %w", postID, err)
 	}
-
 	return nil
 }
 
+// LikePost registers a like
 func (db *DBInterface) LikePost(userID, postID int) error {
-	// Check if already liked
 	var exists bool
 	err := db.conn.QueryRow(context.Background(),
 		"SELECT EXISTS (SELECT 1 FROM post_likes WHERE user_id=$1 AND post_id=$2)", userID, postID).Scan(&exists)
@@ -194,8 +213,8 @@ func (db *DBInterface) LikePost(userID, postID int) error {
 	return tx.Commit(context.Background())
 }
 
+// UnlikePost removes a like
 func (db *DBInterface) UnlikePost(userID, postID int) error {
-	// Ensure the user actually liked the post first
 	var exists bool
 	err := db.conn.QueryRow(context.Background(),
 		"SELECT EXISTS (SELECT 1 FROM post_likes WHERE user_id=$1 AND post_id=$2)", userID, postID).Scan(&exists)
@@ -227,6 +246,7 @@ func (db *DBInterface) UnlikePost(userID, postID int) error {
 	return tx.Commit(context.Background())
 }
 
+// GetPostLikes returns usernames who liked a post
 func (db *DBInterface) GetPostLikes(postID int) ([]string, error) {
 	rows, err := db.conn.Query(context.Background(),
 		`SELECT u.username FROM post_likes pl

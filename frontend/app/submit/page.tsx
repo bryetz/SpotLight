@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/app/hooks/useAuth';
-import { createPost } from '@/app/lib/api';
+import { useAuth } from '@/hooks/useAuth';
+import { createPost } from '@/services/api';
 import { MapPin } from 'lucide-react';
 
 interface Location {
@@ -25,6 +25,7 @@ export default function SubmitPage() {
   useEffect(() => {
     // Redirect if user is not authenticated or userId is missing
     if (!isAuthenticated || !userId) {
+      console.log('Redirecting to login. Why?: ', isAuthenticated, userId);
       router.push('/login');
       return;
     }
@@ -143,10 +144,17 @@ export default function SubmitPage() {
                     <div className="flex items-center text-sm text-white">
                       <MapPin className="w-4 h-4 mr-2 text-[#818384]" />
                       <span className="font-medium">
+<<<<<<< HEAD
                     {location.city}{location.state ? `, ${location.state}` : ''}
                   </span>
                     </div>
                     <div className="text-xs text-[#818384] ml-6">
+=======
+                        {location.city}{location.state ? `, ${location.state}` : ''}
+                      </span>
+                    </div>
+                    <div data-testid="location-coordinates" className="text-xs text-[#818384] ml-6">
+>>>>>>> 707c33a745097b1d1f503e7be831cda025ed93c7
                       {location.lat.toFixed(6)}, {location.lon.toFixed(6)}
                     </div>
                   </div>

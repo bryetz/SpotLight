@@ -2,7 +2,9 @@ package handler
 
 import (
 	"encoding/json"
+	"math"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"SpotLight/backend/src/database"
@@ -21,25 +23,21 @@ func (h *RequestHandler) HandleRegister(w http.ResponseWriter, r *http.Request) 
 		Password string `json:"password"`
 	}
 
-	// Decode JSON request
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"message": "Invalid request payload"}`, http.StatusBadRequest)
 		return
 	}
 
-	// Ensure required fields are present
 	if req.Username == "" || req.Password == "" {
 		http.Error(w, `{"message": "Username and password are required"}`, http.StatusBadRequest)
 		return
 	}
 
-	// Register user
 	if err := h.DB.Register(req.Username, req.Password); err != nil {
 		http.Error(w, `{"message": "User registration failed"}`, http.StatusInternalServerError)
 		return
 	}
 
-	// Return success response
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{"message": "User registered successfully"})
 }
@@ -51,26 +49,22 @@ func (h *RequestHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		Password string `json:"password"`
 	}
 
-	// Decode JSON request
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"message": "Invalid request payload"}`, http.StatusBadRequest)
 		return
 	}
 
-	// Ensure required fields are present
 	if req.Username == "" || req.Password == "" {
 		http.Error(w, `{"message": "Username and password are required"}`, http.StatusBadRequest)
 		return
 	}
 
-	// Authenticate user and retrieve user ID
 	userID, err := h.DB.Authenticate(req.Username, req.Password)
 	if err != nil {
 		http.Error(w, `{"message": "Invalid username or password"}`, http.StatusUnauthorized)
 		return
 	}
 
-	// Return successful login response with user ID
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"message": "Login successful",
 		"user_id": userID,
@@ -83,25 +77,21 @@ func (h *RequestHandler) HandleDeleteUser(w http.ResponseWriter, r *http.Request
 		Username string `json:"username"`
 	}
 
-	// Decode JSON request
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"message": "Invalid request payload"}`, http.StatusBadRequest)
 		return
 	}
 
-	// Ensure required field is present
 	if req.Username == "" {
 		http.Error(w, `{"message": "Username is required"}`, http.StatusBadRequest)
 		return
 	}
 
-	// Delete user
 	if err := h.DB.DeleteUser(req.Username); err != nil {
 		http.Error(w, `{"message": "Failed to delete user"}`, http.StatusInternalServerError)
 		return
 	}
 
-	// Return success response
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "User deleted successfully"})
 }
@@ -115,38 +105,56 @@ func (h *RequestHandler) HandleCreatePost(w http.ResponseWriter, r *http.Request
 		Longitude float64 `json:"longitude"`
 	}
 
-	// Decode JSON request
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"message": "Invalid request payload"}`, http.StatusBadRequest)
 		return
 	}
 
-	// Ensure required fields are present
 	if req.UserID == 0 || req.Content == "" {
 		http.Error(w, `{"message": "User ID and content are required"}`, http.StatusBadRequest)
 		return
 	}
 
-	// Create post
 	if err := h.DB.CreatePost(req.UserID, req.Content, req.Latitude, req.Longitude); err != nil {
 		http.Error(w, `{"message": "Failed to create post"}`, http.StatusInternalServerError)
 		return
 	}
 
-	// Return success response
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Post created successfully"})
 }
 
-// HandleGetPosts retrieves all posts
+// HandleGetPosts retrieves all posts with optional geo-filtering
 func (h *RequestHandler) HandleGetPosts(w http.ResponseWriter, r *http.Request) {
-	posts, err := h.DB.GetPosts()
+	parsedURL, err := url.Parse(r.RequestURI)
+	if err != nil {
+		http.Error(w, `{"message": "Failed to parse query parameters"}`, http.StatusBadRequest)
+		return
+	}
+
+	params := parsedURL.Query()
+
+	latitude, err := strconv.ParseFloat(params.Get("latitude"), 64)
+	if err != nil {
+		latitude = math.Inf(1)
+	}
+
+	longitude, err := strconv.ParseFloat(params.Get("longitude"), 64)
+	if err != nil {
+		longitude = math.Inf(1)
+	}
+
+	distance, err := strconv.Atoi(params.Get("distance"))
+	if err != nil {
+		distance = -1
+	}
+
+	posts, err := h.DB.GetPosts(latitude, longitude, distance)
 	if err != nil {
 		http.Error(w, `{"message": "Failed to retrieve posts"}`, http.StatusInternalServerError)
 		return
 	}
 
-	// Return posts as JSON
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(posts)
 }
@@ -160,17 +168,16 @@ func (h *RequestHandler) HandleDeletePost(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Delete post
 	if err := h.DB.DeletePost(postID); err != nil {
 		http.Error(w, `{"message": "Failed to delete post"}`, http.StatusInternalServerError)
 		return
 	}
 
-	// Return success response
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Post deleted successfully"})
 }
 
+// HandleLikePost handles liking a post
 func (h *RequestHandler) HandleLikePost(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		UserID int `json:"user_id"`
@@ -191,26 +198,7 @@ func (h *RequestHandler) HandleLikePost(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(map[string]string{"message": "Post liked successfully"})
 }
 
-func (h *RequestHandler) HandleGetPostLikes(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	postID, err := strconv.Atoi(vars["id"])
-	if err != nil {
-		http.Error(w, `{"message": "Invalid post ID"}`, http.StatusBadRequest)
-		return
-	}
-
-	usernames, err := h.DB.GetPostLikes(postID)
-	if err != nil {
-		http.Error(w, `{"message": "Failed to retrieve likes"}`, http.StatusInternalServerError)
-		return
-	}
-
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"post_id":   postID,
-		"usernames": usernames,
-	})
-}
-
+// HandleUnlikePost handles unliking a post
 func (h *RequestHandler) HandleUnlikePost(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		UserID int `json:"user_id"`
@@ -229,4 +217,26 @@ func (h *RequestHandler) HandleUnlikePost(w http.ResponseWriter, r *http.Request
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Post unliked successfully"})
+}
+
+// HandleGetPostLikes returns all usernames who liked a post
+func (h *RequestHandler) HandleGetPostLikes(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	postID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		http.Error(w, `{"message": "Invalid post ID"}`, http.StatusBadRequest)
+		return
+	}
+
+	usernames, err := h.DB.GetPostLikes(postID)
+	if err != nil {
+		http.Error(w, `{"message": "Failed to retrieve likes"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"post_id":   postID,
+		"usernames": usernames,
+	})
 }

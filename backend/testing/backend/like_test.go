@@ -5,6 +5,7 @@ import (
 	"SpotLight/backend/src/handler"
 	"bytes"
 	"encoding/json"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -27,7 +28,7 @@ func setupLikeTest(t *testing.T) (*database.DBInterface, *handler.RequestHandler
 		t.Fatalf("Failed to create test post: %v", err)
 	}
 
-	posts, err := db.GetPosts()
+	posts, err := db.GetPosts(0, 0, math.MaxInt)
 	if err != nil || len(posts) == 0 {
 		t.Fatalf("Failed to retrieve posts: %v", err)
 	}

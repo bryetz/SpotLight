@@ -242,6 +242,7 @@ func TestDeletePostEndpoint(t *testing.T) {
 
 	// Get the post_id of the most recent post
 	postID := int(posts[0]["post_id"].(float64)) // Convert from float64
+	t.Logf("Post created with ID: %d", postID)
 
 	deleteReq := httptest.NewRequest("DELETE", "/api/posts/"+strconv.Itoa(postID), nil)
 	deleteReq = mux.SetURLVars(deleteReq, map[string]string{"id": strconv.Itoa(postID)})
@@ -270,4 +271,6 @@ func TestDeletePostEndpoint(t *testing.T) {
 			t.Fatalf("Post was not deleted correctly, still exists in the database")
 		}
 	}
+
+	t.Log("Post successfully deleted")
 }

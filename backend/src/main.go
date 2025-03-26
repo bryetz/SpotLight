@@ -18,6 +18,7 @@ const portNum = ":8080"
 
 func main() {
 	log.Println("Starting the API backend...")
+
 	// Initialize the database connection
 	db, err := database.NewDBInterface()
 	if err != nil {
