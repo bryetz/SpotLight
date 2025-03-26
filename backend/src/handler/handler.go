@@ -240,3 +240,62 @@ func (h *RequestHandler) HandleGetPostLikes(w http.ResponseWriter, r *http.Reque
 		"usernames": usernames,
 	})
 }
+
+// HandleGetNestedComments returns comments on a post and all their replies
+func (h *RequestHandler) HandleGetNestedComments(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	postID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		http.Error(w, `{"message": "Invalid post ID"}`, http.StatusBadRequest)
+		return
+	}
+
+	comments, err := h.DB.GetNestedComments(postID)
+	if err != nil {
+		http.Error(w, `{"message": "Failed to retrieve comments"}`, http.StatusInternalServerError)
+		return
+	}
+
+	// Return [] even if no comments exist
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(comments)
+}
+
+// HandleCreateComment creates a comment on a post with support for replies
+func (h *RequestHandler) HandleCreateComment(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		PostID   int    `json:"post_id"`
+		UserID   int    `json:"user_id"`
+		Content  string `json:"content"`
+		ParentID *int   `json:"parent_id,omitempty"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"message": "Invalid request payload"}`, http.StatusBadRequest)
+		return
+	}
+
+	if err := h.DB.CreateNestedComment(req.PostID, req.UserID, req.ParentID, req.Content); err != nil {
+		http.Error(w, `{"message": "Failed to post comment"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Comment posted"})
+}
+
+func (h *RequestHandler) HandleDeleteComment(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	commentID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		http.Error(w, `{"message": "Invalid comment ID"}`, http.StatusBadRequest)
+		return
+	}
+
+	if err := h.DB.DeleteComment(commentID); err != nil {
+		http.Error(w, `{"message": "Failed to delete comment"}`, http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]string{"message": "Comment deleted"})
+}

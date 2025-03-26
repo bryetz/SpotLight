@@ -1,75 +1,121 @@
-import { Post } from '@/types/post';
-import { MapPin, MessageCircle, Heart, Share2 } from 'lucide-react';
-import { useState } from 'react';
+'use client';
 
-interface PostCardProps {
-  post: Post;
-}
+import { Post, Comment } from '@/types/post';
+import { Heart } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import axios from 'axios';
 
 export function PostCard({ post }: { post: Post }) {
-    const [likes, setLikes] = useState(0);
-    const [isLiked, setIsLiked] = useState(false);
+    const [likes, setLikes] = useState(post.like_count);
+    const [liked, setLiked] = useState(false);
+    const [comments, setComments] = useState<Comment[]>([]);
+    const [commentInput, setCommentInput] = useState('');
+    const { userId, isAuthenticated } = useAuth();
 
-    const handleLike = () => {
-        setLikes(prev => isLiked ? prev - 1 : prev + 1);
-        setIsLiked(!isLiked);
+    const fetchComments = async () => {
+        try {
+            const res = await axios.get(`/api/posts/${post.post_id}/comments`);
+            setComments(Array.isArray(res.data) ? res.data : []);
+        } catch (err: any) {
+            if (err.response?.status !== 404) {
+                console.error('Failed to fetch comments:', err);
+            }
+            setComments([]); // fallback
+        }
     };
 
-    const formatDate = (dateString: string) => {
-        const date = new Date(dateString);
-        const options: Intl.DateTimeFormatOptions = {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: 'numeric',
-            minute: 'numeric',
-            hour12: true,
-            timeZone: 'UTC',
-        };
-        return new Intl.DateTimeFormat('en-US', options).format(date);
+    const handleLike = async () => {
+        if (liked) return;
+        setLiked(true);
+        setLikes((prev) => prev + 1);
+        try {
+            await axios.post('/api/posts/like', {
+                post_id: post.post_id,
+                user_id: userId,
+            });
+        } catch (err) {
+            console.error('Like failed:', err);
+        }
     };
 
-    const formattedDateTime = formatDate(post.created_at);
+    const handleCommentSubmit = async () => {
+        if (!commentInput.trim()) return;
+        try {
+            await axios.post('/api/comments', {
+                post_id: post.post_id,
+                user_id: userId,
+                content: commentInput,
+            });
+            setCommentInput('');
+            fetchComments();
+        } catch (err) {
+            console.error('Comment failed:', err);
+        }
+    };
+
+    useEffect(() => {
+        fetchComments();
+    }, [post.post_id]);
+
+    const renderComments = (commentList: Comment[], indent = 0) => {
+        return commentList.map((comment) => (
+            <div key={comment.comment_id} style={{ marginLeft: indent }}>
+                <p className="text-sm text-white/80">
+                    <span className="font-semibold text-blue-300">{comment.username}</span>: {comment.content}
+                </p>
+                {comment.replies && comment.replies.length > 0 && (
+                    <div className="mt-1">{renderComments(comment.replies, indent + 16)}</div>
+                )}
+            </div>
+        ));
+    };
 
     return (
-        <div className="bg-black/20 backdrop-blur-[4px] border border-[#343536] rounded-lg p-4 hover:border-[#4e4f50] transition-all duration-300 hover:shadow-lg hover:shadow-black/5">
-        <div className="flex items-center mb-3">
-            <div className="flex items-center text-sm text-[#818384]">
-            <span className="font-medium text-white/90 hover:text-white transition-colors">
-                {post.username}
-            </span>
-            <span className="mx-1.5">•</span>
-            <span className="text-[#818384]">{formattedDateTime}</span>
+        <div className="bg-black/30 p-4 rounded-xl text-white space-y-3 border border-white/10">
+            <div className="flex justify-between items-center">
+                <p className="text-sm font-medium">@{post.username}</p>
+                <p className="text-xs text-gray-400">
+                    {new Date(post.created_at).toLocaleString()}
+                </p>
             </div>
-        </div>
 
-        <p className="text-[#d7dadc] mb-4 leading-relaxed whitespace-pre-wrap">{post.content}</p>
-        
-        <div className="flex items-center text-xs text-[#818384] font-medium mb-4">
-            <MapPin className="w-3.5 h-3.5 mr-1" />
-            <span>
-            {post.latitude.toFixed(6)}, {post.longitude.toFixed(6)}
-            </span>
-        </div>
+            <p className="text-base">{post.content}</p>
 
-        <div className="flex items-center space-x-4 pt-2 border-t border-[#343536]">
-            <button 
-            onClick={handleLike}
-            className={`flex items-center space-x-1 text-sm ${isLiked ? 'text-red-400' : 'text-[#818384]'} hover:text-red-400 transition-colors`}
-            >
-            <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
-            <span>{likes}</span>
-            </button>
-            
-            <button className="flex items-center space-x-1 text-sm text-[#818384] hover:text-white transition-colors">
-            <MessageCircle className="w-4 h-4" />
-            <span>0</span>
-            </button>
-            
-            <button className="flex items-center space-x-1 text-sm text-[#818384] hover:text-white transition-colors ml-auto">
-            <Share2 className="w-4 h-4" />
-            </button>
-        </div>
+            <div className="flex items-center gap-4">
+                <button
+                    className={`flex items-center gap-1 text-sm ${
+                        liked ? 'text-red-400' : 'text-white/70'
+                    }`}
+                    onClick={handleLike}
+                >
+                    <Heart className="w-4 h-4" />
+                    {likes}
+                </button>
+                <span className="text-white/70 text-sm">💬 {comments.length}</span>
+            </div>
+
+            <div className="flex items-center gap-2 mt-2">
+                <input
+                    type="text"
+                    className="flex-1 px-2 py-1 rounded-md bg-white/10 border border-white/20 text-sm text-white"
+                    placeholder="Add a comment..."
+                    value={commentInput}
+                    onChange={(e) => setCommentInput(e.target.value)}
+                />
+                <button
+                    onClick={handleCommentSubmit}
+                    className="text-xs px-3 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white"
+                >
+                    Post
+                </button>
+            </div>
+
+            {comments.length > 0 && (
+                <div className="border-t border-white/10 pt-2 space-y-1">
+                    {renderComments(comments)}
+                </div>
+            )}
         </div>
     );
 }

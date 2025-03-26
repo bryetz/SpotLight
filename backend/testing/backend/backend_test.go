@@ -13,6 +13,18 @@ import (
 	"testing"
 )
 
+func extractPostID(t *testing.T, raw interface{}) int {
+	switch v := raw.(type) {
+	case float64:
+		return int(v)
+	case int:
+		return v
+	default:
+		t.Fatalf("Unexpected post_id type: %T", v)
+		return 0
+	}
+}
+
 // setupTestDB initializes the test database connection
 func setupTestDB(t *testing.T) (*database.DBInterface, *bool) {
 	db, err := database.NewDBInterface()

@@ -37,18 +37,6 @@ func setupLikeTest(t *testing.T) (*database.DBInterface, *handler.RequestHandler
 	return db, &handler.RequestHandler{DB: db}, userID, postID, userCreated
 }
 
-func extractPostID(t *testing.T, raw interface{}) int {
-	switch v := raw.(type) {
-	case float64:
-		return int(v)
-	case int:
-		return v
-	default:
-		t.Fatalf("Unexpected post_id type: %T", v)
-		return 0
-	}
-}
-
 func TestLikePost(t *testing.T) {
 	db, handlerInstance, userID, postID, userCreated := setupLikeTest(t)
 	defer db.Close()

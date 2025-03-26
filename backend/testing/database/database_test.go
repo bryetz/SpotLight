@@ -1,25 +1,18 @@
 package database_test
 
 import (
-	"testing"
-
 	"SpotLight/backend/src/database"
-<<<<<<< HEAD
-=======
 	"github.com/joho/godotenv"
->>>>>>> 707c33a745097b1d1f503e7be831cda025ed93c7
+	"testing"
 )
 
 // setupTestDB initializes the test database connection
 func setupTestDB(t *testing.T) *database.DBInterface {
-<<<<<<< HEAD
-=======
 	err := godotenv.Load()
 	if err != nil {
 		t.Log("Warning: .env file not found. Using system environment variables.")
 	}
 
->>>>>>> 707c33a745097b1d1f503e7be831cda025ed93c7
 	db, err := database.NewDBInterface()
 	if err != nil {
 		t.Fatalf("Failed to initialize database: %v", err)
