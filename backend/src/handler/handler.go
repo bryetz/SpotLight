@@ -263,8 +263,14 @@ func (h *RequestHandler) HandleGetNestedComments(w http.ResponseWriter, r *http.
 
 // HandleCreateComment creates a comment on a post with support for replies
 func (h *RequestHandler) HandleCreateComment(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	postID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		http.Error(w, `{"message": "Invalid post ID"}`, http.StatusBadRequest)
+		return
+	}
+
 	var req struct {
-		PostID   int    `json:"post_id"`
 		UserID   int    `json:"user_id"`
 		Content  string `json:"content"`
 		ParentID *int   `json:"parent_id,omitempty"`
@@ -275,7 +281,7 @@ func (h *RequestHandler) HandleCreateComment(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if err := h.DB.CreateNestedComment(req.PostID, req.UserID, req.ParentID, req.Content); err != nil {
+	if err := h.DB.CreateNestedComment(postID, req.UserID, req.ParentID, req.Content); err != nil {
 		http.Error(w, `{"message": "Failed to post comment"}`, http.StatusInternalServerError)
 		return
 	}
