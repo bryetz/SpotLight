@@ -91,27 +91,13 @@ func (fm FileManager) DeleteUserFolder(userName string) error {
 	return err
 }
 
-func (fm FileManager) CreatePostEntity(userName string, postId int) error {
-	var dataDirReq = filepath.Join(fm.DATAROOTDIR, userName)
-	dataDirReq = filepath.Join(dataDirReq, strconv.Itoa(postId))
+func (fm FileManager) CreatePostFile(userName string, postId int, fileName string, data []byte) error {
 
-	_, err := os.Stat(dataDirReq)
-	if os.IsNotExist(err) {
-		// Directory does not exist, so create it
-		err := os.Mkdir(dataDirReq, 0755)
-		if err != nil {
-			return err
-		}
-	}
-	return err
-}
+	var file_name string = strconv.Itoa(postId) + "_" + fileName
 
-func (fm FileManager) AppendPostFile(userName string, postId int, fileName string, data []byte) error {
-	fm.CreatePostEntity(userName, postId) // create folder just in case dne
-
-	var dataDirReq = filepath.Join(fm.DATAROOTDIR, userName)     // append path and user
-	dataDirReq = filepath.Join(dataDirReq, strconv.Itoa(postId)) // append postid folder
-	dataDirReq = filepath.Join(dataDirReq, fileName)             // add the file name to write to
+	var dataDirReq = filepath.Join(fm.DATAROOTDIR, userName) // append path and user
+	//dataDirReq = filepath.Join(dataDirReq, strconv.Itoa(postId)) // append postid folder
+	dataDirReq = filepath.Join(dataDirReq, file_name) // add the file name to write to
 
 	_, err := os.Stat(dataDirReq)
 	if os.IsNotExist(err) {
@@ -127,8 +113,11 @@ func (fm FileManager) AppendPostFile(userName string, postId int, fileName strin
 }
 
 func (fm FileManager) GetPostFile(userName string, postId int, fileName string) ([]byte, error) {
-	var dataDirReq = filepath.Join(fm.DATAROOTDIR, userName)
-	dataDirReq = filepath.Join(dataDirReq, fileName)
+	var file_name string = strconv.Itoa(postId) + "_" + fileName
+
+	var dataDirReq = filepath.Join(fm.DATAROOTDIR, userName) // append path and user
+	//dataDirReq = filepath.Join(dataDirReq, strconv.Itoa(postId)) // append postid folder
+	dataDirReq = filepath.Join(dataDirReq, file_name) // add the file name to write to
 
 	_, err := os.Stat(dataDirReq)
 	if os.IsExist(err) {
@@ -137,13 +126,17 @@ func (fm FileManager) GetPostFile(userName string, postId int, fileName string) 
 	return nil, err
 }
 
-func (fm FileManager) DeletePostEntity(userName string, postId int) error {
-	var dataDirReq = filepath.Join(fm.DATAROOTDIR, userName)
-	dataDirReq = filepath.Join(dataDirReq, strconv.Itoa(postId))
+func (fm FileManager) DeletePostFile(userName string, postId int, fileName string) error {
+	var file_name string = strconv.Itoa(postId) + "_" + fileName
+
+	var dataDirReq = filepath.Join(fm.DATAROOTDIR, userName) // append path and user
+	//dataDirReq = filepath.Join(dataDirReq, strconv.Itoa(postId)) // append postid folder
+	dataDirReq = filepath.Join(dataDirReq, file_name) // add the file name to write to
 
 	var isInScope, err = IsParent(fm.DATAROOTDIR, dataDirReq)
 	if isInScope { // good request, safe to delete folder
-		err = os.RemoveAll(dataDirReq)
+		err = os.Remove(dataDirReq)
+		//err = os.RemoveAll(dataDirReq)
 	}
 	return err
 }
