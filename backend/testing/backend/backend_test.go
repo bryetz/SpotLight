@@ -5,12 +5,13 @@ import (
 	"SpotLight/backend/src/handler"
 	"bytes"
 	"encoding/json"
-	"github.com/gorilla/mux"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/gorilla/mux"
 )
 
 // setupTestDB initializes the test database connection
@@ -36,6 +37,7 @@ func cleanupTestData(db *database.DBInterface, userCreated *bool, t *testing.T) 
 // TestRegisterEndpoint verifies user registration via API
 func TestRegisterEndpoint(t *testing.T) {
 	db, userCreated := setupTestDB(t)
+	fm := database.NewFileManager() // example of creating fm and assigning it
 	defer db.Close()
 	defer cleanupTestData(db, userCreated, t)
 
@@ -44,7 +46,7 @@ func TestRegisterEndpoint(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
-	handlerInstance := handler.RequestHandler{DB: db}
+	handlerInstance := handler.RequestHandler{DB: db, FM: fm}
 	handlerInstance.HandleRegister(rec, req)
 
 	if rec.Code != http.StatusCreated {

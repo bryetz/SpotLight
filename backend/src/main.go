@@ -30,7 +30,7 @@ func main() {
 	defer db.Close()
 
 	// Create request handler
-	handlerInstance := &handler.RequestHandler{DB: db}
+	handlerInstance := &handler.RequestHandler{DB: db, FM: fm}
 
 	// Initialize router and register routes
 	router := mux.NewRouter()
