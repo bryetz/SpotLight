@@ -1,9 +1,10 @@
 package handler
 
 import (
-	"encoding/base64"
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
 	"mime"
 	"net/http"
@@ -143,17 +144,49 @@ func (h *RequestHandler) HandleCreatePost(w http.ResponseWriter, r *http.Request
 			return
 		}
 		// after putting post in database, search for it and get it's id so we put the file in the fileList
-		lastPostVal, err := h.DB.GetLastPostByUser(req.UserID)
-		if err == nil {
-			// decode string data
-			data, err := base64.StdEncoding.DecodeString(req.Media)
-			if err != nil {
-				fmt.Println("Error decoding Base64:", err)
-				return
-			}
-			h.FM.CreatePostFile(strconv.Itoa(req.UserID), lastPostVal, req.FileName, data)
+		lastPostVal, err1 := h.DB.GetLastPostByUser(req.UserID)
+		if err1 != nil {
+			http.Error(w, `{"message": "Failed to get last post"}`, http.StatusInternalServerError)
+			return
 		}
+		userName, err1 := h.DB.GetUserNameId(req.UserID)
+		if err1 != nil {
+			http.Error(w, `{"message": "Failed to get userId"}`, http.StatusInternalServerError)
+			return
+		}
+
+		// fmt.Printf("last post from user %d got is %d\n", req.UserID, lastPostVal)
+
+		// decode string data based on type it is
+
+		// get content type from file extention
+		// ext := filepath.Ext(req.FileName)
+		// // use mime to not write 100 if else cases
+		// contentType := mime.TypeByExtension(ext)
+		// if contentType == "" {
+		// 	contentType = "application/octet-stream" // Fallback for unknown types
+		// }
+
+		var data []byte = []byte(req.Media)
+		// shouldn't support text-based files but for now
+		// if strings.HasPrefix(contentType, "text/") {
+
+		// } else {
+		// 	// otherwise it is a binary data format so decode it
+		// 	// fmt.Println("req media: " + req.Media)
+		// 	data, err = base64.StdEncoding.DecodeString(req.Media)
+		// 	if err != nil {
+		// 		fmt.Println("Error decoding Base64:", err)
+		// 		return
+		// 	}
+		// 	fmt.Println("here to create file for a user")
+		// }
+		fmt.Println("here to create file for a user")
+		//h.FM.CreatePostFile(strconv.Itoa(req.UserID), lastPostVal, req.FileName, data)
+		h.FM.CreatePostFile(userName, lastPostVal, req.FileName, data)
+
 	} else {
+		fmt.Println("here to create basic file for a user")
 		// Create post basic
 		if err := h.DB.CreatePost(req.UserID, req.Content, req.Latitude, req.Longitude); err != nil {
 			http.Error(w, `{"message": "Failed to create post"}`, http.StatusInternalServerError)
@@ -238,27 +271,49 @@ func (h *RequestHandler) HandleGetFile(w http.ResponseWriter, r *http.Request) {
 	//fmt.Println(r.RequestURI)
 	parsedURL, err := url.Parse(r.RequestURI)
 	if err != nil {
-		fmt.Println("Error parsing URL:", err)
+		http.Error(w, `{"message": "Error getting userId"}`, http.StatusInternalServerError)
 		return
 	}
 
 	// get params from parsed header in get request
 	params := parsedURL.Query()
 
+	fmt.Println("got request to get file")
+
 	// Extract specific parameters
+
+	fmt.Println(params.Get("userId"))
 	userId, err := strconv.Atoi(params.Get("userId"))
 	if err != nil {
-		fmt.Println("Error converting userId to int:", err)
+		http.Error(w, `{"message": "Error getting userId"}`, http.StatusInternalServerError)
+		fmt.Println("e4")
+		return
 	}
 
 	postId, err := strconv.Atoi(params.Get("postId"))
 	if err != nil {
-		fmt.Println("Error converting postId to int:", err)
+		http.Error(w, `{"message": "Error getting postId"}`, http.StatusInternalServerError)
+		fmt.Println("e3")
+		return
 	}
 
 	fileName := params.Get("fileName")
+	if fileName == "" {
+		http.Error(w, `{"message": "Error no file name found"}`, http.StatusInternalServerError)
+		fmt.Println("e2")
+		return
+	}
 
-	data, err := h.FM.GetPostFile(strconv.Itoa(userId), postId, fileName)
+	userName, err := h.DB.GetUserNameId(userId)
+	if err != nil {
+		http.Error(w, `{"message": "Error getting username from userId"}`, http.StatusInternalServerError)
+		fmt.Println("e1")
+		return
+	}
+
+	// fmt.Printf("finding file of: %s, %d, %s\n", userName, postId, fileName)
+
+	data, err := h.FM.GetPostFile(userName, postId, fileName) //h.FM.GetPostFile(strconv.Itoa(userId), postId, fileName)
 	if err != nil {
 		http.Error(w, `{"message": "Failed to get post data"}`, http.StatusInternalServerError)
 		return
@@ -276,7 +331,8 @@ func (h *RequestHandler) HandleGetFile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", `attachment; filename="`+fileName+`"`)
 
 	// write data back to user
-	_, err = w.Write(data)
+	fmt.Println("writing back: " + string(data))
+	_, err = io.Copy(w, bytes.NewReader(data)) //w.Write(data)
 	if err != nil {
 		http.Error(w, "Failed to write file.", http.StatusInternalServerError)
 		return

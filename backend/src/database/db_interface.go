@@ -102,6 +102,20 @@ func (db *DBInterface) DeleteUser(username string) error {
 	return nil
 }
 
+// Get username from the id
+func (db *DBInterface) GetUserNameId(id int) (string, error) {
+	var id_ int = -1
+	var userName string = ""
+	var hash string = ""
+	var createdAt time.Time
+	err := db.conn.QueryRow(context.Background(), "SELECT * FROM users WHERE id = $1", id).Scan(&id_, &userName, &hash, &createdAt)
+	if err != nil {
+		//fmt.Println("failed to get username from ID %d: %w", id, err)
+		return "", err
+	}
+	return userName, nil
+}
+
 // CreatePost adds a new post
 func (db *DBInterface) CreatePost(userID int, content string, latitude, longitude float64) error {
 	_, err := db.conn.Exec(context.Background(),
@@ -117,11 +131,13 @@ func (db *DBInterface) CreatePost(userID int, content string, latitude, longitud
 // CreatePost adds a new post
 func (db *DBInterface) CreatePostFile(userID int, content string, latitude, longitude float64, fileName string) error {
 	_, err := db.conn.Exec(context.Background(),
-		"INSERT INTO posts (user_id, content, latitude, longitude, fileName) VALUES ($1, $2, $3, $4, $5)",
+		"INSERT INTO posts (user_id, content, latitude, longitude, file_name) VALUES ($1, $2, $3, $4, $5)",
 		userID, content, latitude, longitude, fileName)
 	if err != nil {
+		fmt.Println("here err in creating post file")
 		return fmt.Errorf("failed to create post: %w", err)
 	}
+	fmt.Println("here postera creating post file")
 
 	return nil
 }
@@ -146,13 +162,13 @@ func (db *DBInterface) GetPosts(reqLatitude float64, reqLongitude float64, dista
 
 	if math.IsInf(reqLatitude, 1) || math.IsInf(reqLongitude, 1) {
 		fmt.Println("Infinite coordinates detected, using simple query without distance filtering")
-		getQuery = `SELECT p.id, u.username, p.content, p.latitude, p.longitude, p.created_at p.file_name
+		getQuery = `SELECT p.id, u.username, p.content, p.latitude, p.longitude, p.created_at, p.file_name
 			FROM posts p
 			JOIN users u ON p.user_id = u.id
 			ORDER BY p.created_at DESC;`
 	} else {
 		getQuery = fmt.Sprintf(`
-			SELECT p.id, u.username, p.content, p.latitude, p.longitude, p.created_at p.file_name
+			SELECT p.id, u.username, p.content, p.latitude, p.longitude, p.created_at, p.file_name
 			FROM posts p
 			JOIN users u ON p.user_id = u.id
 			WHERE ( 6371000 * acos(
@@ -213,18 +229,20 @@ func (db *DBInterface) GetLastPostByUser(userId int) (int, error) {
 	if err != nil {
 		return -1, fmt.Errorf("failed to get last user post from ID %d: %w", userId, err)
 	}
+	var pId int = -1
 	for row.Next() {
 		var postID int
-		var username, content, filename string
+		var userID int
+		var content, filename string
 		var latitude, longitude float64
 		var createdAt time.Time
-		if err := row.Scan(&postID, &username, &content, &latitude, &longitude, &createdAt, &filename); err != nil {
+		if err := row.Scan(&postID, &userID, &content, &latitude, &longitude, &createdAt, &filename); err != nil {
 			log.Printf("Error scanning post row: %v", err)
-			continue
+			return -1, err
 		}
-		return postID, nil
+		pId = postID
 	}
-	return -1, nil
+	return pId, nil
 }
 
 // DeletePost removes a post by ID

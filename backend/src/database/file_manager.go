@@ -74,6 +74,7 @@ func (fm FileManager) CreateUserFolder(userName string) error {
 	_, err := os.Stat(dataDirReq)
 	if os.IsNotExist(err) {
 		// Directory does not exist, so create it
+		//err := os.MkdirAll(dataDirReq, 0755) // not preferred alternative since we should catch a bad preplanned root directory
 		err := os.Mkdir(dataDirReq, 0755)
 		if err != nil {
 			return err
@@ -92,16 +93,18 @@ func (fm FileManager) DeleteUserFolder(userName string) error {
 }
 
 func (fm FileManager) CreatePostFile(userName string, postId int, fileName string, data []byte) error {
+	fm.CreateUserFolder(userName) // create it first if it doesn't exist
 
 	var file_name string = strconv.Itoa(postId) + "_" + fileName
-
 	var dataDirReq = filepath.Join(fm.DATAROOTDIR, userName) // append path and user
-	//dataDirReq = filepath.Join(dataDirReq, strconv.Itoa(postId)) // append postid folder
-	dataDirReq = filepath.Join(dataDirReq, file_name) // add the file name to write to
+	dataDirReq = filepath.Join(dataDirReq, file_name)        // add the file name to write to
 
 	_, err := os.Stat(dataDirReq)
 	if os.IsNotExist(err) {
 		err = os.WriteFile(dataDirReq, data, 0644)
+		if err != nil {
+			fmt.Println(err)
+		}
 	} else {
 		// clear content of original file and overwrite it
 		err = os.Truncate(dataDirReq, 0)
@@ -114,16 +117,10 @@ func (fm FileManager) CreatePostFile(userName string, postId int, fileName strin
 
 func (fm FileManager) GetPostFile(userName string, postId int, fileName string) ([]byte, error) {
 	var file_name string = strconv.Itoa(postId) + "_" + fileName
-
 	var dataDirReq = filepath.Join(fm.DATAROOTDIR, userName) // append path and user
-	//dataDirReq = filepath.Join(dataDirReq, strconv.Itoa(postId)) // append postid folder
-	dataDirReq = filepath.Join(dataDirReq, file_name) // add the file name to write to
+	dataDirReq = filepath.Join(dataDirReq, file_name)        // add the file name to write to
 
-	_, err := os.Stat(dataDirReq)
-	if os.IsExist(err) {
-		return os.ReadFile(dataDirReq)
-	}
-	return nil, err
+	return os.ReadFile(dataDirReq)
 }
 
 func (fm FileManager) DeletePostFile(userName string, postId int, fileName string) error {
