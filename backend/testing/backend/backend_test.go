@@ -176,6 +176,7 @@ func TestGetPostsEndpoint(t *testing.T) {
 // TestDeleteUserEndpoint verifies user deletion via API
 func TestDeleteUserEndpoint(t *testing.T) {
 	db, userCreated := setupTestDB(t)
+	fm := database.NewFileManagerPath("../../../data") // example of creating fm with different folder path
 	defer db.Close()
 	defer cleanupTestData(db, userCreated, t)
 
@@ -190,7 +191,7 @@ func TestDeleteUserEndpoint(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
-	handlerInstance := handler.RequestHandler{DB: db}
+	handlerInstance := handler.RequestHandler{DB: db, FM: fm}
 	handlerInstance.HandleDeleteUser(rec, req)
 
 	if rec.Code != http.StatusOK {

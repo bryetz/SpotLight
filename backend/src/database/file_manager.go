@@ -16,7 +16,7 @@ type FileManager struct {
 
 // non-class specific
 // if we are trying to request files that are not within the root data dir, then we should ignore request for security
-func IsParent(parent, child string) (bool, error) {
+func IsParent(parent string, child string) (bool, error) {
 	// Get absolute paths
 	absParent, err := filepath.Abs(parent)
 	if err != nil {

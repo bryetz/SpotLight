@@ -110,6 +110,12 @@ func (h *RequestHandler) HandleDeleteUser(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// if we delete user, we also delete associated folder
+	if err := h.FM.DeleteUserFolder(req.Username); err != nil {
+		http.Error(w, `{"message": "Failed to delete user's folder"}`, http.StatusInternalServerError)
+		return
+	}
+
 	// Return success response
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "User deleted successfully"})
