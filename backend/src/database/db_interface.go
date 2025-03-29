@@ -3,11 +3,12 @@ package database
 import (
 	"context"
 	"fmt"
-	"github.com/joho/godotenv"
 	"log"
 	"math"
 	"os"
 	"time"
+
+	"github.com/joho/godotenv"
 
 	"github.com/jackc/pgx/v4"
 	"golang.org/x/crypto/bcrypt"
@@ -102,6 +103,20 @@ func (db *DBInterface) DeleteUser(username string) error {
 	return nil
 }
 
+// Get username from the id
+func (db *DBInterface) GetUserNameId(id int) (string, error) {
+	var id_ int = -1
+	var userName string = ""
+	var hash string = ""
+	var createdAt time.Time
+	err := db.conn.QueryRow(context.Background(), "SELECT * FROM users WHERE id = $1", id).Scan(&id_, &userName, &hash, &createdAt)
+	if err != nil {
+		//fmt.Println("failed to get username from ID %d: %w", id, err)
+		return "", err
+	}
+	return userName, nil
+}
+
 // CreatePost adds a new post
 func (db *DBInterface) CreatePost(userID int, content string, latitude, longitude float64) error {
 	_, err := db.conn.Exec(context.Background(),
@@ -113,7 +128,21 @@ func (db *DBInterface) CreatePost(userID int, content string, latitude, longitud
 	return nil
 }
 
-// GetPosts retrieves posts within a given distance (meters)
+// CreatePost adds a new post
+func (db *DBInterface) CreatePostFile(userID int, content string, latitude, longitude float64, fileName string) error {
+	_, err := db.conn.Exec(context.Background(),
+		"INSERT INTO posts (user_id, content, latitude, longitude, file_name) VALUES ($1, $2, $3, $4, $5)",
+		userID, content, latitude, longitude, fileName)
+	if err != nil {
+		fmt.Println("here err in creating post file")
+		return fmt.Errorf("failed to create post: %w", err)
+	}
+	fmt.Println("here postera creating post file")
+
+	return nil
+}
+
+// GetPosts retrieves all posts
 func (db *DBInterface) GetPosts(reqLatitude float64, reqLongitude float64, distance int) ([]map[string]interface{}, error) {
 	if distance < 0 {
 		distance = 25000
@@ -121,13 +150,13 @@ func (db *DBInterface) GetPosts(reqLatitude float64, reqLongitude float64, dista
 
 	var query string
 	if math.IsInf(reqLatitude, 1) || math.IsInf(reqLongitude, 1) {
-		query = `SELECT p.id, u.username, p.content, p.latitude, p.longitude, p.created_at, p.like_count
+		query = `SELECT p.id, u.username, p.content, p.latitude, p.longitude, p.created_at, p.file_name, p.like_count
 				 FROM posts p
 				 JOIN users u ON p.user_id = u.id
 				 ORDER BY p.created_at DESC;`
 	} else {
 		query = fmt.Sprintf(`
-			SELECT p.id, u.username, p.content, p.latitude, p.longitude, p.created_at, p.like_count
+			SELECT p.id, u.username, p.content, p.latitude, p.longitude, p.created_at, p.file_name, p.like_count
 			FROM posts p
 			JOIN users u ON p.user_id = u.id
 			WHERE ( 6371000 * acos(
@@ -147,12 +176,12 @@ func (db *DBInterface) GetPosts(reqLatitude float64, reqLongitude float64, dista
 	var posts []map[string]interface{}
 	for rows.Next() {
 		var postID int
-		var username, content string
+		var username, content, filename string
 		var latitude, longitude float64
 		var createdAt time.Time
 		var likeCount int
 
-		if err := rows.Scan(&postID, &username, &content, &latitude, &longitude, &createdAt, &likeCount); err != nil {
+		if err := rows.Scan(&postID, &username, &content, &latitude, &longitude, &createdAt, &filename, &likeCount); err != nil {
 			log.Printf("Error scanning post row: %v", err)
 			continue
 		}
@@ -164,11 +193,34 @@ func (db *DBInterface) GetPosts(reqLatitude float64, reqLongitude float64, dista
 			"latitude":   latitude,
 			"longitude":  longitude,
 			"created_at": createdAt.Format(time.RFC3339),
+			"file_name":  filename,
 			"like_count": likeCount,
 		})
 	}
 
 	return posts, nil
+}
+
+// helper function to get last postId from userId
+func (db *DBInterface) GetLastPostByUser(userId int) (int, error) {
+	row, err := db.conn.Query(context.Background(), "SELECT * FROM posts WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1", userId)
+	if err != nil {
+		return -1, fmt.Errorf("failed to get last user post from ID %d: %w", userId, err)
+	}
+	var pId int = -1
+	for row.Next() {
+		var postID int
+		var userID int
+		var content, filename string
+		var latitude, longitude float64
+		var createdAt time.Time
+		if err := row.Scan(&postID, &userID, &content, &latitude, &longitude, &createdAt, &filename); err != nil {
+			log.Printf("Error scanning post row: %v", err)
+			return -1, err
+		}
+		pId = postID
+	}
+	return pId, nil
 }
 
 // DeletePost removes a post by ID

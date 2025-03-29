@@ -3,3 +3,7 @@ backend/.env
 .vs/
 backend/*.exe
 backend/*.bat
+.env
+
+data/*
+!data/README.md

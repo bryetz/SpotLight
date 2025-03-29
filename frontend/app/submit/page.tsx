@@ -96,6 +96,8 @@ export default function SubmitPage() {
       await createPost({
         user_id: userId,  // Ensure user_id is included
         content: content.trim(),
+        file_name: "",
+		    media: "",
         latitude: location.lat,
         longitude: location.lon,
       });
