@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"SpotLight/backend/src/database"
+
 	"github.com/joho/godotenv"
 )
 
