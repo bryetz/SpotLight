@@ -293,6 +293,7 @@ func TestDeletePostEndpoint(t *testing.T) {
 			t.Fatalf("Post was not deleted correctly, still exists in the database")
 		}
 	}
+
 	t.Log("Post successfully deleted")
 }
 

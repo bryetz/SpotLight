@@ -146,10 +146,10 @@ export default function SubmitPage() {
                     <div className="flex items-center text-sm text-white">
                       <MapPin className="w-4 h-4 mr-2 text-[#818384]" />
                       <span className="font-medium">
-                        {location.city}{location.state ? `, ${location.state}` : ''}
-                      </span>
+                    {location.city}{location.state ? `, ${location.state}` : ''}
+                  </span>
                     </div>
-                    <div data-testid="location-coordinates" className="text-xs text-[#818384] ml-6">
+                    <div className="text-xs text-[#818384] ml-6">
                       {location.lat.toFixed(6)}, {location.lon.toFixed(6)}
                     </div>
                   </div>
