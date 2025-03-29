@@ -150,12 +150,10 @@ func (h *RequestHandler) HandleCreatePost(w http.ResponseWriter, r *http.Request
 
 		var data []byte = []byte(req.Media)
 
-		fmt.Println("here to create file for a user")
 		//h.FM.CreatePostFile(strconv.Itoa(req.UserID), lastPostVal, req.FileName, data)
 		h.FM.CreatePostFile(userName, lastPostVal, req.FileName, data)
 
 	} else {
-		fmt.Println("here to create basic file for a user")
 		// Create post basic
 		if err := h.DB.CreatePost(req.UserID, req.Content, req.Latitude, req.Longitude); err != nil {
 			http.Error(w, `{"message": "Failed to create post"}`, http.StatusInternalServerError)
@@ -283,6 +281,74 @@ func (h *RequestHandler) HandleGetPostLikes(w http.ResponseWriter, r *http.Reque
 		"post_id":   postID,
 		"usernames": usernames,
 	})
+}
+
+// HandleGetNestedComments returns comments on a post and all their replies
+func (h *RequestHandler) HandleGetNestedComments(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	postID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		http.Error(w, `{"message": "Invalid post ID"}`, http.StatusBadRequest)
+		return
+	}
+
+	comments, err := h.DB.GetNestedComments(postID)
+	if err != nil {
+		http.Error(w, `{"message": "Failed to retrieve comments"}`, http.StatusInternalServerError)
+		return
+	}
+
+	// Return [] even if no comments exist
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(comments)
+}
+
+// HandleCreateComment creates a comment on a post with support for replies
+func (h *RequestHandler) HandleCreateComment(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	postID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		http.Error(w, `{"message": "Invalid post ID"}`, http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		UserID   int    `json:"user_id"`
+		Content  string `json:"content"`
+		ParentID *int   `json:"parent_id,omitempty"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"message": "Invalid request payload"}`, http.StatusBadRequest)
+		return
+	}
+
+	if err := h.DB.CreateNestedComment(postID, req.UserID, req.ParentID, req.Content); err != nil {
+		http.Error(w, `{"message": "Failed to post comment"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"message": "Comment posted"})
+}
+
+// HandleDeleteComment deletes a comment and its nested replies
+func (h *RequestHandler) HandleDeleteComment(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	commentID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		http.Error(w, `{"message": "Invalid comment ID"}`, http.StatusBadRequest)
+		return
+	}
+
+	if err := h.DB.DeleteComment(commentID); err != nil {
+		http.Error(w, `{"message": "Failed to delete comment"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"message": "Comment deleted"})
+
 }
 
 // Get the requested media file from the file manager

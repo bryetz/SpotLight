@@ -142,7 +142,7 @@ func (db *DBInterface) CreatePostFile(userID int, content string, latitude, long
 	return nil
 }
 
-// GetPosts retrieves all posts
+// GetPosts retrieves posts within a given distance (meters)
 func (db *DBInterface) GetPosts(reqLatitude float64, reqLongitude float64, distance int) ([]map[string]interface{}, error) {
 	if distance < 0 {
 		distance = 25000
@@ -214,7 +214,8 @@ func (db *DBInterface) GetLastPostByUser(userId int) (int, error) {
 		var content, filename string
 		var latitude, longitude float64
 		var createdAt time.Time
-		if err := row.Scan(&postID, &userID, &content, &latitude, &longitude, &createdAt, &filename); err != nil {
+		var likeCount int
+		if err := row.Scan(&postID, &userID, &content, &latitude, &longitude, &createdAt, &filename, &likeCount); err != nil {
 			log.Printf("Error scanning post row: %v", err)
 			return -1, err
 		}
@@ -318,4 +319,67 @@ func (db *DBInterface) GetPostLikes(postID int) ([]string, error) {
 		usernames = append(usernames, username)
 	}
 	return usernames, nil
+}
+
+type Comment struct {
+	ID        int        `json:"comment_id"`
+	Username  string     `json:"username"`
+	Content   string     `json:"content"`
+	CreatedAt string     `json:"created_at"`
+	Replies   []*Comment `json:"replies,omitempty"`
+	ParentID  *int       `json:"parent_id,omitempty"`
+}
+
+// GetNestedComments returns comments on a post and all their replies
+func (db *DBInterface) GetNestedComments(postID int) ([]*Comment, error) {
+	rows, err := db.conn.Query(context.Background(), `
+		SELECT c.id, u.username, c.content, c.created_at, c.parent_id
+		FROM comments c
+		JOIN users u ON c.user_id = u.id
+		WHERE c.post_id = $1
+		ORDER BY c.created_at ASC`, postID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	commentMap := make(map[int]*Comment)
+	var roots []*Comment
+
+	for rows.Next() {
+		var c Comment
+		var createdAt time.Time
+		var parentID *int
+		if err := rows.Scan(&c.ID, &c.Username, &c.Content, &createdAt, &parentID); err != nil {
+			continue
+		}
+		c.CreatedAt = createdAt.Format(time.RFC3339)
+		c.ParentID = parentID
+		commentMap[c.ID] = &c
+	}
+
+	for _, comment := range commentMap {
+		if comment.ParentID != nil {
+			parent := commentMap[*comment.ParentID]
+			parent.Replies = append(parent.Replies, comment)
+		} else {
+			roots = append(roots, comment)
+		}
+	}
+
+	return roots, nil
+}
+
+// CreateNestedComment creates a comment on a post with support for replies
+func (db *DBInterface) CreateNestedComment(postID, userID int, parentID *int, content string) error {
+	_, err := db.conn.Exec(context.Background(),
+		"INSERT INTO comments (post_id, user_id, parent_id, content) VALUES ($1, $2, $3, $4)",
+		postID, userID, parentID, content)
+	return err
+}
+
+func (db *DBInterface) DeleteComment(commentID int) error {
+	_, err := db.conn.Exec(context.Background(),
+		"DELETE FROM comments WHERE id=$1", commentID)
+	return err
 }

@@ -1,11 +1,10 @@
 package database_test
 
 import (
-	"testing"
-
 	"SpotLight/backend/src/database"
 
 	"github.com/joho/godotenv"
+	"testing"
 )
 
 // setupTestDB initializes the test database connection

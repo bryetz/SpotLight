@@ -15,8 +15,25 @@ import (
 	"github.com/gorilla/mux"
 )
 
+// had to copy helper files to each test file for it to work for some reason,
+// TODO: if have time maybe have all helper functions here and include it in the other test files without copy paste
+
+func extractPostID(t *testing.T, raw interface{}) int {
+	t.Helper()
+	switch v := raw.(type) {
+	case float64:
+		return int(v)
+	case int:
+		return v
+	default:
+		t.Fatalf("Unexpected post_id type: %T", v)
+		return 0
+	}
+}
+
 // setupTestDB initializes the test database connection
 func setupTestDB(t *testing.T) (*database.DBInterface, *bool) {
+	t.Helper()
 	db, err := database.NewDBInterface()
 	if err != nil {
 		t.Fatalf("Failed to initialize database: %v", err)
@@ -27,6 +44,7 @@ func setupTestDB(t *testing.T) (*database.DBInterface, *bool) {
 
 // cleanupTestData removes test users at the end of each test
 func cleanupTestData(db *database.DBInterface, userCreated *bool, t *testing.T) {
+	t.Helper()
 	if *userCreated {
 		err := db.DeleteUser("testUser")
 		if err != nil {
@@ -37,6 +55,7 @@ func cleanupTestData(db *database.DBInterface, userCreated *bool, t *testing.T) 
 
 // alternative cleanup removes test users at the end of each test
 func cleanupTestDataAll(db *database.DBInterface, fm *database.FileManager, userCreated *bool, t *testing.T) {
+	t.Helper()
 	if *userCreated {
 		err := db.DeleteUser("testUser")
 		if err != nil {

@@ -94,7 +94,7 @@ export default function SubmitPage() {
 
     try {
       await createPost({
-        user_id: userId,  // Ensure user_id is included
+        user_id: userId,
         content: content.trim(),
         file_name: "",
 		    media: "",

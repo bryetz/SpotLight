@@ -63,8 +63,8 @@ export const getPosts = async (params?: {
 }) => {
   // Round the radius to an integer to avoid decimal issues
   const distance = Math.round(params?.radius || 25000); // 25 kilometer default range
-  var reqLatitude = Number.POSITIVE_INFINITY;
-  var reqLongitude = Number.POSITIVE_INFINITY;
+  let reqLatitude = Number.POSITIVE_INFINITY;
+  let reqLongitude = Number.POSITIVE_INFINITY;
 
   try {
     const { latitude, longitude } = await getCurrentLocation();
@@ -86,9 +86,10 @@ export const getPosts = async (params?: {
   // reqLongitude = -82.33680
 }
 
-export const createPost = (data: { 
+export const createPost = (data: {
   title?: string,
-  body: string, 
+  user_id: number,
+  content: string,
   media?: string,
   latitude: number, 
   longitude: number 
@@ -99,7 +100,7 @@ export const getPost = (postId: string) =>
 
 export const updatePost = (postId: string, data: { 
   title?: string, 
-  body?: string, 
+  content?: string,
   media?: string 
 }) => api.put(`/api/posts/${postId}`, data);
 
