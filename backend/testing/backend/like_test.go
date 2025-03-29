@@ -11,6 +11,56 @@ import (
 	"testing"
 )
 
+func extractPostID(t *testing.T, raw interface{}) int {
+	t.Helper()
+	switch v := raw.(type) {
+	case float64:
+		return int(v)
+	case int:
+		return v
+	default:
+		t.Fatalf("Unexpected post_id type: %T", v)
+		return 0
+	}
+}
+
+// setupTestDB initializes the test database connection
+func setupTestDB(t *testing.T) (*database.DBInterface, *bool) {
+	t.Helper()
+	db, err := database.NewDBInterface()
+	if err != nil {
+		t.Fatalf("Failed to initialize database: %v", err)
+	}
+	userCreated := false
+	return db, &userCreated
+}
+
+// cleanupTestData removes test users at the end of each test
+func cleanupTestData(db *database.DBInterface, userCreated *bool, t *testing.T) {
+	t.Helper()
+	if *userCreated {
+		err := db.DeleteUser("testUser")
+		if err != nil {
+			t.Logf("Warning: Failed to delete test user: %v", err)
+		}
+	}
+}
+
+// alternative cleanup removes test users at the end of each test
+func cleanupTestDataAll(db *database.DBInterface, fm *database.FileManager, userCreated *bool, t *testing.T) {
+	t.Helper()
+	if *userCreated {
+		err := db.DeleteUser("testUser")
+		if err != nil {
+			t.Logf("Warning: Failed to delete test user: %v", err)
+		}
+		err = fm.DeleteUserFolder("testUser")
+		if err != nil {
+			t.Logf("Warning: Failed to delete test user folder: %v", err)
+		}
+	}
+}
+
 func setupLikeTest(t *testing.T) (*database.DBInterface, *handler.RequestHandler, int, int, *bool) {
 	db, userCreated := setupTestDB(t)
 

@@ -2,6 +2,7 @@ package routes
 
 import (
 	"SpotLight/backend/src/handler"
+
 	"github.com/gorilla/mux"
 )
 
@@ -26,4 +27,7 @@ func RegisterRoutes(router *mux.Router, h *handler.RequestHandler) {
 	router.HandleFunc("/api/posts/{id}/comments", h.HandleCreateComment).Methods("POST")
 	router.HandleFunc("/api/posts/{id}/comments", h.HandleGetNestedComments).Methods("GET")
 	router.HandleFunc("/api/comments/{id}", h.HandleDeleteComment).Methods("DELETE")
+
+	// Post file related routes
+	router.HandleFunc("/api/file", h.HandleGetFile).Methods("GET")
 }

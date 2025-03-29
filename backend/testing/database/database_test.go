@@ -2,6 +2,7 @@ package database_test
 
 import (
 	"SpotLight/backend/src/database"
+
 	"github.com/joho/godotenv"
 	"testing"
 )

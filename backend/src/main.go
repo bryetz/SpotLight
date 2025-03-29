@@ -19,7 +19,10 @@ const portNum = ":8080"
 func main() {
 	log.Println("Starting the API backend...")
 
-	// Initialize the database connection
+	// Create file management system based on default relative path
+	fm := database.NewFileManager()
+
+	// Initialize the database
 	db, err := database.NewDBInterface()
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
@@ -27,7 +30,7 @@ func main() {
 	defer db.Close()
 
 	// Create request handler
-	handlerInstance := &handler.RequestHandler{DB: db}
+	handlerInstance := &handler.RequestHandler{DB: db, FM: fm}
 
 	// Initialize router and register routes
 	router := mux.NewRouter()
