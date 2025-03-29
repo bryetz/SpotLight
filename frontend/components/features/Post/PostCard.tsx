@@ -1,4 +1,8 @@
-'use client';
+import { Post } from '@/types/post';
+import { MapPin, MessageCircle, Heart, Share2 } from 'lucide-react';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 
 import { Post, Comment } from '@/types/post';
 import { Heart } from 'lucide-react';
@@ -7,12 +11,18 @@ import { useAuth } from '@/hooks/useAuth';
 import axios from 'axios';
 
 export function PostCard({ post }: { post: Post }) {
+    const router = useRouter();
+
+    const handleClick = () => {
+        router.push(`/post/${post.post_id}`);
+    };
+    
     const [likes, setLikes] = useState(post.like_count);
     const [liked, setLiked] = useState(false);
     const [comments, setComments] = useState<Comment[]>([]);
     const [commentInput, setCommentInput] = useState('');
     const { userId, isAuthenticated } = useAuth();
-
+    
     const fetchComments = async () => {
         try {
             const res = await axios.get(`/api/posts/${post.post_id}/comments`);
@@ -26,6 +36,7 @@ export function PostCard({ post }: { post: Post }) {
     };
 
     const handleLike = async () => {
+        e.stopPropagation();
         if (liked) return;
         setLiked(true);
         setLikes((prev) => prev + 1);
@@ -71,51 +82,91 @@ export function PostCard({ post }: { post: Post }) {
         ));
     };
 
-    return (
-        <div className="bg-black/30 p-4 rounded-xl text-white space-y-3 border border-white/10">
-            <div className="flex justify-between items-center">
-                <p className="text-sm font-medium">@{post.username}</p>
-                <p className="text-xs text-gray-400">
-                    {new Date(post.created_at).toLocaleString()}
-                </p>
-            </div>
+    const renderMedia = () => {
+        if (!post.media) return null;
 
-            <p className="text-base">{post.content}</p>
-
-            <div className="flex items-center gap-4">
-                <button
-                    className={`flex items-center gap-1 text-sm ${
-                        liked ? 'text-red-400' : 'text-white/70'
-                    }`}
-                    onClick={handleLike}
-                >
-                    <Heart className="w-4 h-4" />
-                    {likes}
-                </button>
-                <span className="text-white/70 text-sm">💬 {comments.length}</span>
-            </div>
-
-            <div className="flex items-center gap-2 mt-2">
-                <input
-                    type="text"
-                    className="flex-1 px-2 py-1 rounded-md bg-white/10 border border-white/20 text-sm text-white"
-                    placeholder="Add a comment..."
-                    value={commentInput}
-                    onChange={(e) => setCommentInput(e.target.value)}
-                />
-                <button
-                    onClick={handleCommentSubmit}
-                    className="text-xs px-3 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white"
-                >
-                    Post
-                </button>
-            </div>
-
-            {comments.length > 0 && (
-                <div className="border-t border-white/10 pt-2 space-y-1">
-                    {renderComments(comments)}
+        if (post.media_type === 'video') {
+            return (
+                <div className="relative w-full aspect-video mb-4 rounded-lg overflow-hidden">
+                    <video 
+                        className="w-full h-full object-cover"
+                        controls
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <source src={post.media} />
+                        Your browser does not support video playback.
+                    </video>
                 </div>
-            )}
+            );
+        }
+
+        if (post.media_type === 'image') {
+            return (
+                <div className="relative w-full aspect-video mb-4 rounded-lg overflow-hidden">
+                    <Image
+                        src={post.media}
+                        alt="Post media"
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    />
+                </div>
+            );
+        }
+
+        return null;
+    };
+
+    return (
+        <div 
+            onClick={handleClick}
+            className="bg-black/20 backdrop-blur-[4px] border border-[#343536] rounded-lg p-4 hover:border-[#4e4f50] transition-all duration-300 hover:shadow-lg hover:shadow-black/5 cursor-pointer"
+        >
+            <div className="flex items-center mb-3">
+                <div className="flex items-center text-sm text-[#818384]">
+                    <span className="font-medium text-white/90 hover:text-white transition-colors">
+                        {post.username}
+                    </span>
+                    <span className="mx-1.5">•</span>
+                    <span className="text-[#818384]">{formattedDateTime}</span>
+                </div>
+            </div>
+
+            <p className="text-[#d7dadc] mb-4 leading-relaxed whitespace-pre-wrap">{post.content}</p>
+            
+            {renderMedia()}
+            
+            <div className="flex items-center text-xs text-[#818384] font-medium mb-4">
+                <MapPin className="w-3.5 h-3.5 mr-1" />
+                <span>
+                    {post.latitude.toFixed(6)}, {post.longitude.toFixed(6)}
+                </span>
+            </div>
+
+            <div className="flex items-center space-x-4 pt-2 border-t border-[#343536]">
+                <button 
+                    onClick={handleLike}
+                    className={`flex items-center space-x-1 text-sm ${isLiked ? 'text-red-400' : 'text-[#818384]'} hover:text-red-400 transition-colors`}
+                >
+                    <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
+                    <span>{likes}</span>
+                </button>
+                
+                <button 
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex items-center space-x-1 text-sm text-[#818384] hover:text-white transition-colors"
+                >
+                    <MessageCircle className="w-4 h-4" />
+                    <span>0</span>
+                </button>
+                
+                <button 
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex items-center space-x-1 text-sm text-[#818384] hover:text-white transition-colors ml-auto"
+                >
+                    <Share2 className="w-4 h-4" />
+                </button>
+            </div>
         </div>
     );
 }
