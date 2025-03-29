@@ -4,40 +4,83 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
-interface PostCardProps {
-  post: Post;
-}
+import { Post, Comment } from '@/types/post';
+import { Heart } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import axios from 'axios';
 
 export function PostCard({ post }: { post: Post }) {
     const router = useRouter();
-    const [likes, setLikes] = useState(0);
-    const [isLiked, setIsLiked] = useState(false);
 
     const handleClick = () => {
         router.push(`/post/${post.post_id}`);
     };
-
-    const handleLike = (e: React.MouseEvent) => {
-        e.stopPropagation(); // Prevent post navigation when clicking like
-        setLikes(prev => isLiked ? prev - 1 : prev + 1);
-        setIsLiked(!isLiked);
+    
+    const [likes, setLikes] = useState(post.like_count);
+    const [liked, setLiked] = useState(false);
+    const [comments, setComments] = useState<Comment[]>([]);
+    const [commentInput, setCommentInput] = useState('');
+    const { userId, isAuthenticated } = useAuth();
+    
+    const fetchComments = async () => {
+        try {
+            const res = await axios.get(`/api/posts/${post.post_id}/comments`);
+            setComments(Array.isArray(res.data) ? res.data : []);
+        } catch (err: any) {
+            if (err.response?.status !== 404) {
+                console.error('Failed to fetch comments:', err);
+            }
+            setComments([]); // fallback
+        }
     };
 
-    const formatDate = (dateString: string) => {
-        const date = new Date(dateString);
-        const options: Intl.DateTimeFormatOptions = {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: 'numeric',
-            minute: 'numeric',
-            hour12: true,
-            timeZone: 'UTC',
-        };
-        return new Intl.DateTimeFormat('en-US', options).format(date);
+    const handleLike = async () => {
+        e.stopPropagation();
+        if (liked) return;
+        setLiked(true);
+        setLikes((prev) => prev + 1);
+        try {
+            await axios.post('/api/posts/like', {
+                post_id: post.post_id,
+                user_id: userId,
+            });
+        } catch (err) {
+            console.error('Like failed:', err);
+        }
     };
 
-    const formattedDateTime = formatDate(post.created_at);
+    const handleCommentSubmit = async () => {
+        if (!commentInput.trim()) return;
+        try {
+            await axios.post('/api/comments', {
+                post_id: post.post_id,
+                user_id: userId,
+                content: commentInput,
+            });
+            setCommentInput('');
+            fetchComments();
+        } catch (err) {
+            console.error('Comment failed:', err);
+        }
+    };
+
+    useEffect(() => {
+        fetchComments();
+    }, [post.post_id]);
+
+    const renderComments = (commentList: Comment[], indent = 0) => {
+        return commentList.map((comment) => (
+            <div key={comment.comment_id} style={{ marginLeft: indent }}>
+                <p className="text-sm text-white/80">
+                    <span className="font-semibold text-blue-300">{comment.username}</span>: {comment.content}
+                </p>
+                {comment.replies && comment.replies.length > 0 && (
+                    <div className="mt-1">{renderComments(comment.replies, indent + 16)}</div>
+                )}
+            </div>
+        ));
+    };
 
     const renderMedia = () => {
         if (!post.media) return null;

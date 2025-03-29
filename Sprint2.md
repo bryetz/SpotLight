@@ -1,4 +1,3 @@
-
 # Sprint 2 Report
 
 ## Completed Work
@@ -136,4 +135,3 @@
 ```json
 { "message": "Post deleted successfully" }
 ```
-
