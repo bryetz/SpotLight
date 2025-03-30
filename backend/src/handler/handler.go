@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -148,7 +149,19 @@ func (h *RequestHandler) HandleCreatePost(w http.ResponseWriter, r *http.Request
 			return
 		}
 
-		var data []byte = []byte(req.Media)
+		// if file is text do simple convert, if binary conv base 64
+        ext := filepath.Ext(req.FileName)
+        var data []byte //var data []byte = []byte(req.Media)
+        var err error
+        if ext == ".txt" {
+            data = []byte(req.Media)
+        } else {
+            data, err = base64.StdEncoding.DecodeString(req.Media)
+            if err != nil {
+                fmt.Printf("Error decoding base64: %v\n", err)
+                return
+            }
+        }
 
 		//h.FM.CreatePostFile(strconv.Itoa(req.UserID), lastPostVal, req.FileName, data)
 		h.FM.CreatePostFile(userName, lastPostVal, req.FileName, data)

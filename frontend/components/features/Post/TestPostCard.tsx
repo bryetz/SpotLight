@@ -2,7 +2,7 @@ import { Post } from '@/types/post';
 import { useState, useEffect } from 'react';
 import { getFile } from '@/services/api';
 
-export function PostCard({ post }: { post: Post }) {
+export function TestPostCard({ post }: { post: Post }) {
     const [imageData, setImageData] = useState<string | null>(null);
 
     useEffect(() => {

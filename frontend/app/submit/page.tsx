@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { createPost } from '@/services/api';
-import { MapPin, Image, X } from 'lucide-react';
+import { MapPin, Image, X, ChartNoAxesColumnDecreasing } from 'lucide-react';
 
 interface Location {
   lat: number;
@@ -105,6 +105,8 @@ export default function SubmitPage() {
     // Create preview
     const reader = new FileReader();
     reader.onloadend = () => {
+      // The result will be a data URL like "data:image/jpeg;base64,/9j/4AAQ..."
+      // We store the full data URL for preview
       setMediaPreview(reader.result as string);
     };
     reader.readAsDataURL(file);
@@ -144,28 +146,34 @@ export default function SubmitPage() {
       let fileName = '';
 
       if (mediaFile) {
-        // Convert file to base64
+        // Read file as base64
         const reader = new FileReader();
-        mediaData = await new Promise((resolve, reject) => {
-          reader.onloadend = () => resolve(reader.result as string);
+        const base64Promise = new Promise<string>((resolve, reject) => {
+          reader.onload = () => {
+            // Extract only the base64 data part after the comma
+            // e.g., from "data:image/jpeg;base64,/9j/4AAQ..." we only want "/9j/4AAQ..."
+            const result = reader.result as string;
+            const base64Data = result.split(',')[1];
+            resolve(base64Data);
+          };
           reader.onerror = reject;
-          reader.readAsDataURL(mediaFile);
         });
-        
-        // Extract base64 data 
-        mediaData = mediaData.split(',')[1];
+
+        reader.readAsDataURL(mediaFile);
+        mediaData = await base64Promise;
         fileName = mediaFile.name;
       }
 
-      await createPost({
+      const postData = {
         user_id: userId,
         content: content.trim(),
         file_name: fileName,
         media: mediaData,
         latitude: location.lat,
         longitude: location.lon,
-      });
+      };
 
+      await createPost(postData);
       router.push('/');
     } catch (err) {
       console.error('Post creation failed:', err);

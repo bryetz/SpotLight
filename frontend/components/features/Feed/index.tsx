@@ -2,6 +2,7 @@
 
 import { Post } from '@/types/post';
 import { PostCard } from '@/components/features/Post/PostCard';
+import { TestPostCard } from '@/components/features/Post/TestPostCard';
 import { SlidersHorizontal, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getPosts } from '@/services/api';

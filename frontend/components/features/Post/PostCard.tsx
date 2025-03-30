@@ -3,7 +3,7 @@ import { MapPin, MessageCircle, Heart, Share2, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
-import { likePost, unlikePost, getComments, createComment } from '@/services/api';
+import { likePost, unlikePost, getComments, createComment, getFile } from '@/services/api';
 
 export function PostCard({ post }: { post: Post }) {
     const router = useRouter();
@@ -15,10 +15,16 @@ export function PostCard({ post }: { post: Post }) {
     const [showComments, setShowComments] = useState(false);
     const [commentInput, setCommentInput] = useState('');
     const [isLoadingComments, setIsLoadingComments] = useState(false);
+    const [mediaData, setMediaData] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         fetchComments();
-    }, [post.post_id]);
+        if (post.file_name) {
+            loadMedia();
+        }
+    }, [post.post_id, post.file_name, post.user_id]);
 
     const fetchComments = async () => {
         setIsLoadingComments(true);
@@ -73,6 +79,46 @@ export function PostCard({ post }: { post: Post }) {
         } catch (err) {
             console.error('Failed to post comment:', err);
         }
+    };
+
+    const loadMedia = async () => {
+        try {
+            setIsLoading(true);
+            setError(null);
+            
+            const response = await getFile({
+                userId: post.user_id,
+                postId: post.post_id,
+                fileName: post.file_name!
+            });
+
+            // Convert array buffer to base64
+            const arrayBuffer = response.data;
+            const base64 = arrayBufferToBase64(arrayBuffer);
+            
+            // Determine content type from file extension
+            const ext = post.file_name!.split('.').pop()?.toLowerCase();
+            const isVideo = ['mp4', 'mov', 'quicktime'].includes(ext || '');
+            const mimeType = isVideo ? 'video' : 'image';
+            const dataUrl = `data:${mimeType}/${ext};base64,${base64}`;
+            
+            setMediaData(dataUrl);
+        } catch (error) {
+            console.error('Error loading media:', error);
+            setError('Failed to load media');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Helper function to convert array buffer to base64
+    const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        return window.btoa(binary);
     };
 
     const renderComments = () => {
@@ -152,6 +198,37 @@ export function PostCard({ post }: { post: Post }) {
             </div>
 
             <p className="text-[#d7dadc] mb-4 whitespace-pre-wrap">{post.content}</p>
+            
+            {/* Media Display */}
+            {post.file_name && (
+                <div className="mb-4">
+                    {isLoading ? (
+                        <div className="w-full h-48 bg-black/40 rounded-lg flex items-center justify-center">
+                            <span className="text-[#818384]">Loading media...</span>
+                        </div>
+                    ) : error ? (
+                        <div className="w-full bg-red-500/10 text-red-400 p-3 rounded-lg text-sm">
+                            {error}
+                        </div>
+                    ) : mediaData && (
+                        <div className="relative">
+                            {post.file_name.match(/\.(mp4|mov|quicktime)$/i) ? (
+                                <video 
+                                    src={mediaData}
+                                    controls
+                                    className="w-full rounded-lg max-h-[512px] object-contain bg-black/40"
+                                />
+                            ) : (
+                                <img 
+                                    src={mediaData}
+                                    alt="Post media"
+                                    className="w-full rounded-lg max-h-[512px] object-contain bg-black/40"
+                                />
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
             
             <div className="flex items-center text-xs text-[#818384] font-medium mb-4">
                 <MapPin className="w-3.5 h-3.5 mr-1" />
