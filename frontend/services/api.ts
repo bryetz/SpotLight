@@ -43,23 +43,13 @@ export const login = (username: string, password: string) =>
 export const register = (username: string, password: string) => 
   api.post('/api/register', { username, password });
 
-export const getProfile = () => 
-  api.get('/api/auth/profile');
-
-export const updateProfile = (data: { username?: string, profile_picture?: string, bio?: string }) => 
-  api.put('/api/auth/profile', data);
-
-export const getUserProfile = (userId: string) => 
-  api.get(`/api/users/${userId}`);
+export const deleteUser = (username: string) =>
+  api.delete('/api/delete-user', { data: { username } });
 
 export const getPosts = async (params?: {
-  sort?: 'new' | 'popular' | 'hot',
-  time_filter?: 'today' | 'past_week' | 'past_month',
   latitude?: number,
   longitude?: number,
   radius?: number,
-  limit?: number,
-  offset?: number
 }) => {
   // Round the radius to an integer to avoid decimal issues
   const distance = Math.round(params?.radius || 25000); // 25 kilometer default range
@@ -76,63 +66,51 @@ export const getPosts = async (params?: {
     console.error(error);
     return api.get(`/api/posts?latitude=${reqLatitude}&longitude=${reqLongitude}&distance=${distance}`)
   }
-
-  // example test, (26.062, -80.3368) versus (29.5, -82.3368)
-  // passes with distance of 430km but not 420km, good!
-
-  // comments of hardcoding for testing:
-  // distance = 430_000;
-  // reqLatitude = 29.5;
-  // reqLongitude = -82.33680
 }
 
 export const createPost = (data: {
-  title?: string,
   user_id: number,
   content: string,
-  media?: string,
+  file_name?: string, // media file name
+  media?: string, // actual media data
   latitude: number, 
   longitude: number 
 }) => api.post('/api/posts', data);
 
-export const getPost = (postId: string) => 
-  api.get(`/api/posts/${postId}`);
-
-export const updatePost = (postId: string, data: { 
-  title?: string, 
-  content?: string,
-  media?: string 
-}) => api.put(`/api/posts/${postId}`, data);
-
-export const deletePost = (postId: string) => 
+export const deletePost = (postId: string) =>  // ts prolly dont work because idk if its param based or req based
   api.delete(`/api/posts/${postId}`);
 
-// Comments endpoints
-export const getComments = (postId: string) => 
-  api.get(`/api/posts/${postId}/comments`);
-
-export const createComment = (postId: string, data: { 
-  content: string, 
-  parent_comment_id?: string 
-}) => api.post(`/api/posts/${postId}/comments`, data);
-
-export const updateComment = (commentId: string, content: string) => 
-  api.put(`/api/comments/${commentId}`, { content });
-
-export const deleteComment = (commentId: string) => 
-  api.delete(`/api/comments/${commentId}`);
 
 // Likes endpoints
-export const likePost = (postId: string) => 
-  api.post(`/api/posts/${postId}/like`);
+export const likePost = (userId: number, postId: number) => 
+  api.post(`/api/posts/${postId}/like`, { user_id: userId, post_id: postId });
 
-export const unlikePost = (postId: string) => 
-  api.delete(`/api/posts/${postId}/like`);
+export const unlikePost = (userId: number, postId: number) => 
+  api.post(`/api/posts/${postId}/unlike`, { user_id: userId, post_id: postId });
 
-export const likeComment = (commentId: string) => 
-  api.post(`/api/comments/${commentId}/like`);
+export const getPostLikes = (postId: string) =>
+  api.get(`/api/posts/${postId}/likes`);
 
-export const unlikeComment = (commentId: string) => 
-  api.delete(`/api/comments/${commentId}/like`);
+
+// Comments endpoints
+export const createComment = (postId: number, data: {
+  user_id: number,
+  content: string,
+  parent_id?: number
+}) => api.post(`/api/posts/${postId}/comments`, data);
+
+export const getComments = (postId: number) =>
+  api.get(`/api/posts/${postId}/comments`);
+
+export const deleteComment = (commentId: number) =>
+  api.delete(`/api/comments/${commentId}`);
+
+
+// File endpoint
+export const getFile = (params: {
+  userId: number,
+  postId: number,
+  fileName: string
+}) => api.get(`/api/file`, { params });
 
 export default api; 

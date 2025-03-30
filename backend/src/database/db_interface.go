@@ -150,13 +150,13 @@ func (db *DBInterface) GetPosts(reqLatitude float64, reqLongitude float64, dista
 
 	var query string
 	if math.IsInf(reqLatitude, 1) || math.IsInf(reqLongitude, 1) {
-		query = `SELECT p.id, u.username, p.content, p.latitude, p.longitude, p.created_at, p.file_name, p.like_count
+		query = `SELECT p.id, p.user_id, u.username, p.content, p.latitude, p.longitude, p.created_at, p.file_name, p.like_count
 				 FROM posts p
 				 JOIN users u ON p.user_id = u.id
 				 ORDER BY p.created_at DESC;`
 	} else {
 		query = fmt.Sprintf(`
-			SELECT p.id, u.username, p.content, p.latitude, p.longitude, p.created_at, p.file_name, p.like_count
+			SELECT p.id, p.user_id, u.username, p.content, p.latitude, p.longitude, p.created_at, p.file_name, p.like_count
 			FROM posts p
 			JOIN users u ON p.user_id = u.id
 			WHERE ( 6371000 * acos(
@@ -176,18 +176,20 @@ func (db *DBInterface) GetPosts(reqLatitude float64, reqLongitude float64, dista
 	var posts []map[string]interface{}
 	for rows.Next() {
 		var postID int
+		var userID int
 		var username, content, filename string
 		var latitude, longitude float64
 		var createdAt time.Time
 		var likeCount int
 
-		if err := rows.Scan(&postID, &username, &content, &latitude, &longitude, &createdAt, &filename, &likeCount); err != nil {
+		if err := rows.Scan(&postID, &userID, &username, &content, &latitude, &longitude, &createdAt, &filename, &likeCount); err != nil {
 			log.Printf("Error scanning post row: %v", err)
 			continue
 		}
 
 		posts = append(posts, map[string]interface{}{
 			"post_id":    postID,
+			"user_id":    userID,
 			"username":   username,
 			"content":    content,
 			"latitude":   latitude,

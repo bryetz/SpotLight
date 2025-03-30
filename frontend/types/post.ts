@@ -4,6 +4,7 @@ export type Comment = {
   content: string;
   created_at: string;
   replies?: Comment[];
+  parent_id?: number;
 };
 
 export type Post = {
@@ -11,8 +12,7 @@ export type Post = {
   user_id: number;
   username: string;
   content: string;
-  media?: string;  // URL to media content
-  media_type?: 'image' | 'video';  // Type of media
+  file_name?: string;  // Changed from media to file_name to match backend
   latitude: number;
   longitude: number;
   created_at: string;

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { createPost } from '@/services/api';
-import { MapPin } from 'lucide-react';
+import { MapPin, Image, X } from 'lucide-react';
 
 interface Location {
   lat: number;
@@ -14,6 +14,17 @@ interface Location {
   state?: string;
 }
 
+// Add supported file types
+const SUPPORTED_FILE_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'video/mp4',
+  'video/quicktime'
+];
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB limit
+
 export default function SubmitPage() {
   const { isAuthenticated, userId } = useAuth();
   const router = useRouter();
@@ -21,6 +32,10 @@ export default function SubmitPage() {
   const [location, setLocation] = useState<Location | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // Add media states
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [mediaPreview, setMediaPreview] = useState<string>('');
 
   useEffect(() => {
     // Redirect if user is not authenticated or userId is missing
@@ -71,6 +86,38 @@ export default function SubmitPage() {
     }
   }, [isAuthenticated, userId]);
 
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!SUPPORTED_FILE_TYPES.includes(file.type)) {
+      setError('Unsupported file type. Please upload an image or video.');
+      return;
+    }
+
+    // Validate file size
+    if (file.size > MAX_FILE_SIZE) {
+      setError('File is too large. Maximum size is 5MB.');
+      return;
+    }
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setMediaPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+
+    setMediaFile(file);
+    setError('');
+  };
+
+  const clearMedia = () => {
+    setMediaFile(null);
+    setMediaPreview('');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -93,11 +140,28 @@ export default function SubmitPage() {
     setError('');
 
     try {
+      let mediaData = '';
+      let fileName = '';
+
+      if (mediaFile) {
+        // Convert file to base64
+        const reader = new FileReader();
+        mediaData = await new Promise((resolve, reject) => {
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(mediaFile);
+        });
+        
+        // Extract base64 data (remove data:image/jpeg;base64, prefix)
+        mediaData = mediaData.split(',')[1];
+        fileName = mediaFile.name;
+      }
+
       await createPost({
         user_id: userId,
         content: content.trim(),
-        file_name: "",
-		    media: "",
+        file_name: fileName,
+        media: mediaData,
         latitude: location.lat,
         longitude: location.lon,
       });
@@ -116,64 +180,110 @@ export default function SubmitPage() {
   }
 
   return (
-      <main className="min-h-screen py-12 px-4">
-        <div className="max-w-2xl mx-auto">
-          <div className="bg-black/20 backdrop-blur-[4px] border border-[#343536] rounded-lg p-6">
-            <h1 className="text-2xl font-bold text-white mb-6">Create Post</h1>
+    <main className="min-h-screen py-12 px-4">
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-black/20 backdrop-blur-[4px] border border-[#343536] rounded-lg p-6">
+          <h1 className="text-2xl font-bold text-white mb-6">Create Post</h1>
 
-            {error && (
-                <div className="bg-red-500/10 border border-red-500/50 rounded px-4 py-3 mb-6 text-sm text-red-400">
-                  {error}
-                </div>
-            )}
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/50 rounded px-4 py-3 mb-6 text-sm text-red-400">
+              {error}
+            </div>
+          )}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
               <textarea
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  placeholder="What's on your mind?"
-                  className="w-full px-3 py-2 bg-black/40 border border-[#343536] rounded-md text-white text-sm focus:outline-none focus:border-[#4e4f50] transition-colors min-h-[180px] resize-none"
-                  maxLength={500}
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="What's on your mind?"
+                className="w-full px-3 py-2 bg-black/40 border border-[#343536] rounded-md text-white text-sm focus:outline-none focus:border-[#4e4f50] transition-colors min-h-[180px] resize-none"
+                maxLength={500}
               />
-                <div className="mt-1 text-xs text-[#818384] flex justify-between">
-                  <span>{content.length}/500</span>
-                </div>
+              <div className="mt-1 text-xs text-[#818384] flex justify-between">
+                <span>{content.length}/500</span>
               </div>
+            </div>
 
-              {location && (
-                  <div className="flex flex-col space-y-1">
-                    <div className="flex items-center text-sm text-white">
-                      <MapPin className="w-4 h-4 mr-2 text-[#818384]" />
-                      <span className="font-medium">
-                    {location.city}{location.state ? `, ${location.state}` : ''}
-                  </span>
-                    </div>
-                    <div className="text-xs text-[#818384] ml-6">
-                      {location.lat.toFixed(6)}, {location.lon.toFixed(6)}
+            {/* Media Upload Section */}
+            <div className="space-y-2">
+              {mediaPreview ? (
+                <div className="relative">
+                  {mediaFile?.type.startsWith('image/') ? (
+                    <img 
+                      src={mediaPreview} 
+                      alt="Upload preview" 
+                      className="max-h-64 rounded-lg object-contain bg-black/40"
+                    />
+                  ) : (
+                    <video 
+                      src={mediaPreview} 
+                      controls 
+                      className="max-h-64 rounded-lg w-full"
+                    />
+                  )}
+                  <button
+                    type="button"
+                    onClick={clearMedia}
+                    className="absolute top-2 right-2 p-1 bg-black/60 rounded-full hover:bg-black/80 transition-colors"
+                  >
+                    <X className="w-4 h-4 text-white" />
+                  </button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept={SUPPORTED_FILE_TYPES.join(',')}
+                    onChange={handleFileSelect}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <div className="flex items-center justify-center h-32 border-2 border-dashed border-[#343536] rounded-lg hover:border-[#4e4f50] transition-colors">
+                    <div className="flex flex-col items-center text-[#818384]">
+                      <Image className="w-6 h-6 mb-2" />
+                      <span className="text-sm">Add Image or Video</span>
+                      <span className="text-xs mt-1">Max size: 5MB</span>
                     </div>
                   </div>
+                </div>
               )}
+            </div>
 
-              <div className="flex justify-end space-x-3">
-                <button
-                    type="button"
-                    onClick={() => router.back()}
-                    className="px-4 py-2 text-[#818384] hover:text-white text-sm transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                    type="submit"
-                    disabled={isLoading || !location}
-                    className="px-4 py-2 bg-white hover:bg-gray-100 disabled:opacity-50 disabled:hover:bg-white text-black text-sm font-medium rounded-md transition-colors"
-                >
-                  {isLoading ? 'Posting...' : 'Post'}
-                </button>
+            {/* Existing Location Display */}
+            {location && (
+              <div className="flex flex-col space-y-1">
+                <div className="flex items-center text-sm text-white">
+                  <MapPin className="w-4 h-4 mr-2 text-[#818384]" />
+                  <span className="font-medium">
+                    {location.city}{location.state ? `, ${location.state}` : ''}
+                  </span>
+                </div>
+                <div className="text-xs text-[#818384] ml-6">
+                  {location.lat.toFixed(6)}, {location.lon.toFixed(6)}
+                </div>
               </div>
-            </form>
-          </div>
+            )}
+
+            {/* Existing Submit Buttons */}
+            <div className="flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className="px-4 py-2 text-[#818384] hover:text-white text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isLoading || !location}
+                className="px-4 py-2 bg-white hover:bg-gray-100 disabled:opacity-50 disabled:hover:bg-white text-black text-sm font-medium rounded-md transition-colors"
+              >
+                {isLoading ? 'Posting...' : 'Post'}
+              </button>
+            </div>
+          </form>
         </div>
-      </main>
+      </div>
+    </main>
   );
 }
