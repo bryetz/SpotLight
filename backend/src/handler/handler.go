@@ -367,67 +367,82 @@ func (h *RequestHandler) HandleDeleteComment(w http.ResponseWriter, r *http.Requ
 // Get the requested media file from the file manager
 func (h *RequestHandler) HandleGetFile(w http.ResponseWriter, r *http.Request) {
 	// parse url
-	//fmt.Println(r.RequestURI)
 	parsedURL, err := url.Parse(r.RequestURI)
 	if err != nil {
-		http.Error(w, `{"message": "Error getting userId"}`, http.StatusInternalServerError)
+		fmt.Printf("Error parsing URL: %v\n", err)
+		http.Error(w, fmt.Sprintf(`{"message": "Error parsing URL: %v"}`, err), http.StatusBadRequest)
 		return
 	}
 
 	// get params from parsed header in get request
 	params := parsedURL.Query()
 
-	// Extract specific parameters
-
-	fmt.Println(params.Get("userId"))
-	userId, err := strconv.Atoi(params.Get("userId"))
+	// Extract specific parameters and log them
+	userIdStr := params.Get("userId")
+	fmt.Printf("Received request - userId: %s\n", userIdStr)
+	
+	userId, err := strconv.Atoi(userIdStr)
 	if err != nil {
-		http.Error(w, `{"message": "Error getting userId"}`, http.StatusInternalServerError)
+		fmt.Printf("Error converting userId: %v\n", err)
+		http.Error(w, fmt.Sprintf(`{"message": "Invalid userId format: %v"}`, err), http.StatusBadRequest)
 		return
 	}
 
-	postId, err := strconv.Atoi(params.Get("postId"))
+	postIdStr := params.Get("postId")
+	fmt.Printf("postId: %s\n", postIdStr)
+	postId, err := strconv.Atoi(postIdStr)
 	if err != nil {
-		http.Error(w, `{"message": "Error getting postId"}`, http.StatusInternalServerError)
+		fmt.Printf("Error converting postId: %v\n", err)
+		http.Error(w, fmt.Sprintf(`{"message": "Invalid postId format: %v"}`, err), http.StatusBadRequest)
 		return
 	}
 
 	fileName := params.Get("fileName")
+	fmt.Printf("fileName: %s\n", fileName)
 	if fileName == "" {
-		http.Error(w, `{"message": "Error no file name found"}`, http.StatusInternalServerError)
+		fmt.Println("No filename provided")
+		http.Error(w, `{"message": "No filename provided"}`, http.StatusBadRequest)
 		return
 	}
 
 	userName, err := h.DB.GetUserNameId(userId)
 	if err != nil {
-		http.Error(w, `{"message": "Error getting username from userId"}`, http.StatusInternalServerError)
+		fmt.Printf("Error getting username for userId %d: %v\n", userId, err)
+		http.Error(w, fmt.Sprintf(`{"message": "Error getting username for userId %d: %v"}`, userId, err), http.StatusInternalServerError)
 		return
 	}
+	fmt.Printf("Retrieved username: %s\n", userName)
 
-	// fmt.Printf("finding file of: %s, %d, %s\n", userName, postId, fileName)
-
-	data, err := h.FM.GetPostFile(userName, postId, fileName) //h.FM.GetPostFile(strconv.Itoa(userId), postId, fileName)
+	// Attempt to get the file
+	fmt.Printf("Attempting to get file: user=%s, postId=%d, fileName=%s\n", userName, postId, fileName)
+	data, err := h.FM.GetPostFile(userName, postId, fileName)
 	if err != nil {
-		http.Error(w, `{"message": "Failed to get post data"}`, http.StatusInternalServerError)
+		fmt.Printf("Error getting file: %v\n", err)
+		http.Error(w, fmt.Sprintf(`{"message": "Failed to get file: %v"}`, err), http.StatusInternalServerError)
 		return
 	}
 
-	// get content type from file extention
+	// get content type from file extension
 	ext := filepath.Ext(fileName)
-	// use mime to not write 100 if else cases
 	contentType := mime.TypeByExtension(ext)
 	if contentType == "" {
-		contentType = "application/octet-stream" // Fallback for unknown types
+		contentType = "application/octet-stream"
 	}
-	// set headers and write
+	fmt.Printf("Content-Type: %s\n", contentType)
+
+	// set headers
 	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Content-Disposition", `attachment; filename="`+fileName+`"`)
 
 	// write data back to user
-	fmt.Println("writing back: " + string(data))
-	_, err = io.Copy(w, bytes.NewReader(data)) //w.Write(data)
+	fmt.Printf("File size: %d bytes\n", len(data))
+	_, err = io.Copy(w, bytes.NewReader(data))
 	if err != nil {
-		http.Error(w, "Failed to write file.", http.StatusInternalServerError)
+		fmt.Printf("Error writing response: %v\n", err)
+		// Note: At this point headers are already sent, so we can't send an error response
+		// But we can log it
 		return
 	}
+
+	fmt.Printf("Successfully served file: %s\n", fileName)
 }

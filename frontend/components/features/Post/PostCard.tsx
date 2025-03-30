@@ -86,6 +86,12 @@ export function PostCard({ post }: { post: Post }) {
             setIsLoading(true);
             setError(null);
             
+            console.log('Requesting file:', {
+                userId: post.user_id,
+                postId: post.post_id,
+                fileName: post.file_name
+            });
+
             const response = await getFile({
                 userId: post.user_id,
                 postId: post.post_id,
@@ -103,9 +109,32 @@ export function PostCard({ post }: { post: Post }) {
             const dataUrl = `data:${mimeType}/${ext};base64,${base64}`;
             
             setMediaData(dataUrl);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error loading media:', error);
-            setError('Failed to load media');
+            // Try to parse the error message from the response
+            let errorMessage = 'Failed to load media';
+            try {
+                if (error.response?.data) {
+                    if (typeof error.response.data === 'string') {
+                        try {
+                            const parsed = JSON.parse(error.response.data);
+                            errorMessage = parsed.message || errorMessage;
+                        } catch {
+                            errorMessage = error.response.data;
+                        }
+                    } else {
+                        errorMessage = error.response.data.message || errorMessage;
+                    }
+                }
+                console.error('Detailed error:', {
+                    status: error.response?.status,
+                    statusText: error.response?.statusText,
+                    message: errorMessage
+                });
+            } catch (e) {
+                console.error('Error parsing error message:', e);
+            }
+            setError(errorMessage);
         } finally {
             setIsLoading(false);
         }
