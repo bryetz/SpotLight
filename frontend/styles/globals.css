@@ -159,3 +159,19 @@ body {
   }
 }
 
+@keyframes slideDown {
+  from {
+      max-height: 0;
+      opacity: 0;
+      transform: translateY(-10px);
+  }
+  to {
+      max-height: 200px;
+      opacity: 1;
+      transform: translateY(0);
+  }
+}
+
+.animate-slideDown {
+  animation: slideDown 0.2s ease-in-out forwards;
+}

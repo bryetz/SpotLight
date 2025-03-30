@@ -122,4 +122,8 @@ export const getFile = async ({
     });
 };
 
+// check if a post is liked by the user
+export const checkPostLiked = (postId: number, userId: number) =>
+  api.get(`/api/posts/${postId}/liked`, { params: { userId } });
+
 export default api; 

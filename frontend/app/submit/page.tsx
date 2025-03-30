@@ -14,77 +14,87 @@ interface Location {
   state?: string;
 }
 
-// Add supported file types
+// File configuration
+const MB_IN_BYTES = 1024 * 1024;
+const MAX_FILE_SIZE_MB = 100; // Easily change this value to any MB limit
+const MAX_FILE_SIZE = MAX_FILE_SIZE_MB * MB_IN_BYTES;
+
+// Add supported file types with more video formats
 const SUPPORTED_FILE_TYPES = [
+  // Images
   'image/jpeg',
   'image/png',
   'image/gif',
+  // Videos
   'video/mp4',
-  'video/quicktime'
+  'video/quicktime', // .mov files
+  'video/x-msvideo',  // .avi files
+  'video/webm'
 ];
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB limit
-
 export default function SubmitPage() {
-  const { isAuthenticated, userId } = useAuth();
+  const { isAuthenticated, userId, isLoading: isAuthLoading } = useAuth();
   const router = useRouter();
   const [content, setContent] = useState('');
   const [location, setLocation] = useState<Location | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
   
   // Add media states
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string>('');
 
   useEffect(() => {
-    // Redirect if user is not authenticated or userId is missing
-    if (!isAuthenticated || !userId) {
-      console.log('Redirecting to login. Why?: ', isAuthenticated, userId);
-      router.push('/login');
-      return;
-    }
+    // Only proceed with auth check after useAuth has finished loading
+    if (!isAuthLoading) {
+      if (!isAuthenticated || !userId) {
+        console.log('Redirecting to login. Why?: ', isAuthenticated, userId);
+        router.push('/login');
+        return;
+      }
 
-    // Attempt to get user's location
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-          async (position) => {
-            const { latitude, longitude } = position.coords;
-            try {
-              // Reverse geocode location
-              const response = await fetch(
-                  `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
-              );
-              const data = await response.json();
+      // Attempt to get user's location
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+              const { latitude, longitude } = position.coords;
+              try {
+                // Reverse geocode location
+                const response = await fetch(
+                    `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+                );
+                const data = await response.json();
 
-              const address = data.address || {};
-              const city = address.city || address.town || address.village || 'Unknown City';
-              const state = address.state || '';
+                const address = data.address || {};
+                const city = address.city || address.town || address.village || 'Unknown City';
+                const state = address.state || '';
 
-              setLocation({
-                lat: latitude,
-                lon: longitude,
-                address: data.display_name,
-                city,
-                state,
-              });
-            } catch (err) {
-              console.error('Error fetching location:', err);
-              setLocation({
-                lat: latitude,
-                lon: longitude,
-              });
+                setLocation({
+                  lat: latitude,
+                  lon: longitude,
+                  address: data.display_name,
+                  city,
+                  state,
+                });
+              } catch (err) {
+                console.error('Error fetching location:', err);
+                setLocation({
+                  lat: latitude,
+                  lon: longitude,
+                });
+              }
+            },
+            (err) => {
+              console.error('Error getting geolocation:', err);
+              setError('Please enable location services to create a post.');
             }
-          },
-          (err) => {
-            console.error('Error getting geolocation:', err);
-            setError('Please enable location services to create a post.');
-          }
-      );
-    } else {
-      setError('Geolocation is not supported by your browser.');
+        );
+      } else {
+        setError('Geolocation is not supported by your browser.');
+      }
     }
-  }, [isAuthenticated, userId]);
+  }, [isAuthenticated, userId, isAuthLoading]);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -92,13 +102,13 @@ export default function SubmitPage() {
 
     // Validate file type
     if (!SUPPORTED_FILE_TYPES.includes(file.type)) {
-      setError('Unsupported file type. Please upload an image or video.');
+      setError(`Unsupported file type. Supported types: ${SUPPORTED_FILE_TYPES.map(type => type.split('/')[1]).join(', ')}`);
       return;
     }
 
     // Validate file size
     if (file.size > MAX_FILE_SIZE) {
-      setError('File is too large. Maximum size is 5MB.');
+      setError(`File is too large. Maximum size is ${MAX_FILE_SIZE_MB}MB. Your file is ${(file.size / MB_IN_BYTES).toFixed(1)}MB`);
       return;
     }
 
@@ -183,6 +193,18 @@ export default function SubmitPage() {
     }
   };
 
+  // Show loading state while useAuth is determining status
+  if (isAuthLoading) {
+    return (
+      <main className="min-h-screen py-12 px-4 flex items-center justify-center">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="w-8 h-8 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+          <p className="text-white/60 text-sm">Loading...</p>
+        </div>
+      </main>
+    );
+  }
+
   if (!isAuthenticated) {
     return null;
   }
@@ -250,7 +272,7 @@ export default function SubmitPage() {
                     <div className="flex flex-col items-center text-[#818384]">
                       <Image className="w-6 h-6 mb-2" />
                       <span className="text-sm">Add Image or Video</span>
-                      <span className="text-xs mt-1">Max size: 5MB</span>
+                      <span className="text-xs mt-1">Max size: {MAX_FILE_SIZE_MB}MB</span>
                     </div>
                   </div>
                 </div>

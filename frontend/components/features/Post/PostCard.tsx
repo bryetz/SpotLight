@@ -1,13 +1,17 @@
 import { Post, Comment } from '@/types/post';
-import { MapPin, MessageCircle, Heart, Share2, Loader2 } from 'lucide-react';
+import { MapPin, MessageCircle, Heart, Share2, Loader2, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
-import { likePost, unlikePost, getComments, createComment, getFile } from '@/services/api';
+import { likePost, unlikePost, getComments, createComment, getFile, checkPostLiked, deleteComment } from '@/services/api';
+
+interface ExpandedComments {
+  [key: number]: boolean;
+}
 
 export function PostCard({ post }: { post: Post }) {
     const router = useRouter();
-    const { userId, isAuthenticated } = useAuth();
+    const { userId, isAuthenticated, username } = useAuth();
     
     const [likes, setLikes] = useState(post.like_count);
     const [liked, setLiked] = useState(false);
@@ -18,18 +22,35 @@ export function PostCard({ post }: { post: Post }) {
     const [mediaData, setMediaData] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [expandedComments, setExpandedComments] = useState<ExpandedComments>({});
+    const [replyingTo, setReplyingTo] = useState<number | null>(null);
+    const [replyInput, setReplyInput] = useState<string>('');
 
     useEffect(() => {
         fetchComments();
         if (post.file_name) {
             loadMedia();
         }
-    }, [post.post_id, post.file_name, post.user_id]);
+        const checkInitialLikeStatus = async () => {
+            if (isAuthenticated && userId) {
+                try {
+                    const response = await checkPostLiked(post.post_id, userId);
+                    console.log('Initial like status response:', response.data);
+                    setLiked(response.data.result);
+                } catch (err) {
+                    console.error('Failed to check initial like status:', err);
+                }
+            }
+        };
+
+        checkInitialLikeStatus();
+    }, [post.post_id, post.file_name, post.user_id, userId, isAuthenticated]);
 
     const fetchComments = async () => {
         setIsLoadingComments(true);
         try {
             const response = await getComments(post.post_id);
+            console.log('Fetch comments response:', response.data);
             setComments(Array.isArray(response.data) ? response.data : []);
         } catch (err) {
             console.error('Failed to fetch comments:', err);
@@ -48,33 +69,53 @@ export function PostCard({ post }: { post: Post }) {
 
         try {
             if (liked) {
-                await unlikePost(userId!, post.post_id);
-                setLikes(prev => prev - 1);
+                const response = await unlikePost(userId!, post.post_id);
+                console.log('Unlike response:', response.data);
+                if (response.data.message === "Post unliked successfully") {
+                    setLikes(prev => prev - 1);
+                    setLiked(false);
+                }
             } else {
-                await likePost(userId!, post.post_id);
-                setLikes(prev => prev + 1);
+                const response = await likePost(userId!, post.post_id);
+                console.log('Like response:', response.data);
+                if (response.data.message === "Post liked successfully") {
+                    setLikes(prev => prev + 1);
+                    setLiked(true);
+                }
             }
-            setLiked(!liked);
         } catch (err) {
             console.error('Like action failed:', err);
+            // Optionally recheck like status on error
+            const response = await checkPostLiked(post.post_id, userId!);
+            setLiked(response.data.result);
         }
     };
 
-    const handleCommentSubmit = async (e: React.FormEvent) => {
+    const handleCommentSubmit = async (e: React.FormEvent, parentId?: number) => {
         e.preventDefault();
         if (!isAuthenticated) {
             router.push('/login');
             return;
         }
 
-        if (!commentInput.trim()) return;
+        const input = parentId ? replyInput : commentInput;
+        if (!input.trim()) return;
 
         try {
-            await createComment(post.post_id, {
+            const response = await createComment(post.post_id, {
                 user_id: userId!,
-                content: commentInput.trim()
+                content: input.trim(),
+                parent_id: parentId || undefined
             });
-            setCommentInput('');
+            console.log('Comment creation response:', response.data);
+            
+            if (parentId) {
+                setReplyInput('');
+            } else {
+                setCommentInput('');
+            }
+            
+            setReplyingTo(null);
             fetchComments();
         } catch (err) {
             console.error('Failed to post comment:', err);
@@ -150,12 +191,155 @@ export function PostCard({ post }: { post: Post }) {
         return window.btoa(binary);
     };
 
+    const toggleComment = (commentId: number) => {
+        setExpandedComments(prev => ({
+            ...prev,
+            [commentId]: !prev[commentId]
+        }));
+    };
+
+    const handleDeleteComment = async (commentId: number) => {
+        try {
+            const response = await deleteComment(commentId);
+            console.log('Delete comment response:', response.data);
+            fetchComments(); // Refresh comments after deletion
+        } catch (err) {
+            console.error('Failed to delete comment:', err);
+        }
+    };
+
+    const renderComment = (comment: Comment, depth: number = 0) => {
+        const isExpanded = expandedComments[comment.comment_id] ?? true;
+        const hasReplies = comment.replies && comment.replies.length > 0;
+        const isOwnComment = comment.username === username;
+
+        const formatDate = (dateString: string) => {
+            const date = new Date(dateString);
+            return date.toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        };
+
+        return (
+            <div 
+                key={comment.comment_id} 
+                className={`relative ${depth > 0 ? 'ml-4 mt-2' : 'mt-4'}`}
+            >
+                {depth > 0 && (
+                    <button
+                        onClick={() => toggleComment(comment.comment_id)}
+                        className="absolute left-0 top-0 bottom-0 w-[2px] bg-[#343536] hover:bg-white/50 transition-all duration-200 cursor-pointer group"
+                        title={isExpanded ? "Collapse thread" : "Expand thread"}
+                    >
+                        <div className="absolute left-0 top-0 bottom-0 w-1 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/30" />
+                    </button>
+                )}
+                <div className={`pl-4 transition-all duration-200 ease-in-out ${isExpanded ? 'opacity-100' : 'opacity-60'}`}>
+                    <div className="flex items-center gap-2">
+                        <span className="font-medium text-white/90">{comment.username}</span>
+                        <span className="text-[#818384] text-xs">
+                            {formatDate(comment.created_at)}
+                        </span>
+                        {isOwnComment && (
+                            <button
+                                onClick={() => handleDeleteComment(comment.comment_id)}
+                                className="ml-auto p-1 text-[#818384] hover:text-red-400 transition-colors"
+                                title="Delete comment"
+                            >
+                                <Trash2 className="w-3 h-3" />
+                            </button>
+                        )}
+                    </div>
+                    <p className="text-white/80 mt-1">{comment.content}</p>
+                    
+                    <div className="flex items-center gap-4 mt-2">
+                        <button
+                            onClick={() => setReplyingTo(comment.comment_id)}
+                            className="text-xs text-[#818384] hover:text-white transition-colors"
+                        >
+                            Reply
+                        </button>
+                        {hasReplies && (
+                            <button
+                                onClick={() => toggleComment(comment.comment_id)}
+                                className="flex items-center gap-1 text-xs text-[#818384] hover:text-white transition-colors"
+                            >
+                                {isExpanded ? (
+                                    <>
+                                        <ChevronUp className="w-3 h-3 transition-transform duration-200" />
+                                        Hide Replies
+                                    </>
+                                ) : (
+                                    <>
+                                        <ChevronDown className="w-3 h-3 transition-transform duration-200" />
+                                        Show Replies ({comment.replies?.length ?? 0})
+                                    </>
+                                )}
+                            </button>
+                        )}
+                    </div>
+
+                    {replyingTo === comment.comment_id && (
+                        <div className="mt-2 overflow-hidden transition-all duration-200 ease-in-out">
+                            <form onSubmit={(e) => handleCommentSubmit(e, comment.comment_id)} className="animate-slideDown">
+                                <input
+                                    type="text"
+                                    value={replyInput}
+                                    onChange={(e) => setReplyInput(e.target.value)}
+                                    placeholder={`Reply to ${comment.username}...`}
+                                    className="w-full bg-black/40 border border-[#343536] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#4e4f50]"
+                                />
+                                <div className="flex justify-end gap-2 mt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setReplyingTo(null);
+                                            setReplyInput('');
+                                        }}
+                                        className="px-3 py-1 text-[#818384] hover:text-white text-sm transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={!replyInput.trim()}
+                                        className="px-3 py-1 bg-white/10 hover:bg-white/20 text-white rounded text-sm disabled:opacity-50"
+                                    >
+                                        Reply
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    )}
+
+                    {hasReplies && comment.replies && (
+                        <div 
+                            className={`
+                                overflow-hidden transition-all duration-200 ease-in-out
+                                ${isExpanded ? 'max-h-[5000px] opacity-100' : 'max-h-0 opacity-0'}
+                            `}
+                        >
+                            <div className={`space-y-2 pt-2 transition-all duration-200 ease-in-out
+                                ${isExpanded ? 'translate-y-0' : '-translate-y-2'}
+                            `}>
+                                {comment.replies.map(reply => renderComment(reply, depth + 1))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
     const renderComments = () => {
         if (!showComments) return null;
 
         return (
-            <div className="mt-4 space-y-3">
-                <form onSubmit={handleCommentSubmit} className="flex gap-2">
+            <div className="mt-4">
+                <form onSubmit={(e) => handleCommentSubmit(e)} className="flex gap-2">
                     <input
                         type="text"
                         value={commentInput}
@@ -176,34 +360,9 @@ export function PostCard({ post }: { post: Post }) {
                     <div className="flex justify-center py-4">
                         <Loader2 className="w-6 h-6 text-white animate-spin" />
                     </div>
-                ) : Array.isArray(comments) && comments.length > 0 ? (
-                    <div className="space-y-2">
-                        {comments.map((comment) => (
-                            <div key={comment.comment_id} className="text-sm">
-                                <div className="flex items-center gap-2">
-                                    <span className="font-medium text-white/90">{comment.username}</span>
-                                    <span className="text-[#818384] text-xs">
-                                        {new Date(comment.created_at).toLocaleDateString()}
-                                    </span>
-                                </div>
-                                <p className="text-white/80 mt-1">{comment.content}</p>
-                                {Array.isArray(comment.replies) && comment.replies.length > 0 && (
-                                    <div className="ml-4 mt-2 space-y-2 border-l-2 border-[#343536] pl-4">
-                                        {comment.replies.map(reply => (
-                                            <div key={reply.comment_id}>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-medium text-white/90">{reply.username}</span>
-                                                    <span className="text-[#818384] text-xs">
-                                                        {new Date(reply.created_at).toLocaleDateString()}
-                                                    </span>
-                                                </div>
-                                                <p className="text-white/80 mt-1">{reply.content}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        ))}
+                ) : comments.length > 0 ? (
+                    <div>
+                        {comments.map(comment => renderComment(comment))}
                     </div>
                 ) : (
                     <div className="text-center py-4 text-[#818384]">
