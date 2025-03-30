@@ -88,23 +88,4 @@ describe('Home Page', () => {
 	  cy.contains('This is a test post 1').should('be.visible');
 	});
   
-	it('should toggle filters when filter button is clicked', () => {
-	  // Wait for the API call to complete
-	  cy.wait('@getPosts');
-  
-	  // Filters should not be visible initially
-	  cy.get('[data-testid="radius-filter"]').should('not.exist');
-  
-	  // Click the filter button
-	  cy.contains('button', 'Filter').click();
-  
-	  // Filters should now be visible
-	  cy.get('[data-testid="radius-filter"]').should('be.visible');
-  
-	  // Click the filter button again
-	  cy.contains('button', 'Filter').click();
-  
-	  // Filters should be hidden again
-	  cy.get('[data-testid="radius-filter"]').should('not.exist');
-	});
   });

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { likePost, unlikePost, getComments, createComment, getFile, checkPostLiked, deleteComment } from '@/services/api';
+import { formatDistanceToNow, format, parseISO } from 'date-fns';
 
 interface ExpandedComments {
   [key: number]: boolean;
@@ -214,13 +215,8 @@ export function PostCard({ post }: { post: Post }) {
         const isOwnComment = comment.username === username;
 
         const formatDate = (dateString: string) => {
-            const date = new Date(dateString);
-            return date.toLocaleString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
+            const date = parseISO(dateString.replace('Z', ''));
+            return format(date, 'MMM d, h:mm a');
         };
 
         return (
@@ -381,7 +377,9 @@ export function PostCard({ post }: { post: Post }) {
                         {post.username}
                     </span>
                     <span className="mx-1.5">•</span>
-                    <span>{new Date(post.created_at).toLocaleDateString()}</span>
+                    <span>
+                        {format(parseISO(post.created_at.replace('Z', '')), 'MMM d, h:mm a')}
+                    </span>
                 </div>
             </div>
 
