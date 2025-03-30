@@ -150,18 +150,18 @@ func (h *RequestHandler) HandleCreatePost(w http.ResponseWriter, r *http.Request
 		}
 
 		// if file is text do simple convert, if binary conv base 64
-        ext := filepath.Ext(req.FileName)
-        var data []byte //var data []byte = []byte(req.Media)
-        var err error
-        if ext == ".txt" {
-            data = []byte(req.Media)
-        } else {
-            data, err = base64.StdEncoding.DecodeString(req.Media)
-            if err != nil {
-                fmt.Printf("Error decoding base64: %v\n", err)
-                return
-            }
-        }
+		ext := filepath.Ext(req.FileName)
+		var data []byte //var data []byte = []byte(req.Media)
+		var err error
+		if ext == ".txt" {
+			data = []byte(req.Media)
+		} else {
+			data, err = base64.StdEncoding.DecodeString(req.Media)
+			if err != nil {
+				fmt.Printf("Error decoding base64: %v\n", err)
+				return
+			}
+		}
 
 		//h.FM.CreatePostFile(strconv.Itoa(req.UserID), lastPostVal, req.FileName, data)
 		h.FM.CreatePostFile(userName, lastPostVal, req.FileName, data)
@@ -296,6 +296,39 @@ func (h *RequestHandler) HandleGetPostLikes(w http.ResponseWriter, r *http.Reque
 	})
 }
 
+// HandleGetPostLikes returns boolean if user liked a post
+func (h *RequestHandler) HandleCheckPostLiked(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	postID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		http.Error(w, `{"message": "Invalid post ID"}`, http.StatusBadRequest)
+		return
+	}
+
+	parsedURL, err := url.Parse(r.RequestURI)
+	// check get request param for userID
+	params := parsedURL.Query()
+
+	userId, err := strconv.Atoi(params.Get("userId"))
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"result": false,
+		})
+		return
+	}
+
+	boolCond, err := h.DB.CheckUserLikedPost(postID, userId)
+	if err != nil {
+		http.Error(w, `{"message": "Failed to retrieve likes"}`, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"result": boolCond,
+	})
+}
+
 // HandleGetNestedComments returns comments on a post and all their replies
 func (h *RequestHandler) HandleGetNestedComments(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
@@ -380,7 +413,7 @@ func (h *RequestHandler) HandleGetFile(w http.ResponseWriter, r *http.Request) {
 	// Extract specific parameters and log them
 	userIdStr := params.Get("userId")
 	fmt.Printf("Received request - userId: %s\n", userIdStr)
-	
+
 	userId, err := strconv.Atoi(userIdStr)
 	if err != nil {
 		fmt.Printf("Error converting userId: %v\n", err)

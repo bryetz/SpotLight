@@ -22,6 +22,7 @@ func RegisterRoutes(router *mux.Router, h *handler.RequestHandler) {
 	router.HandleFunc("/api/posts/{id}/like", h.HandleLikePost).Methods("POST")
 	router.HandleFunc("/api/posts/{id}/unlike", h.HandleUnlikePost).Methods("POST")
 	router.HandleFunc("/api/posts/{id}/likes", h.HandleGetPostLikes).Methods("GET")
+	router.HandleFunc("/api/posts/{id}/liked", h.HandleCheckPostLiked).Methods("GET")
 
 	// Comment-related routes
 	router.HandleFunc("/api/posts/{id}/comments", h.HandleCreateComment).Methods("POST")

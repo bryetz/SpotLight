@@ -329,6 +329,27 @@ func (db *DBInterface) GetPostLikes(postID int) ([]string, error) {
 	return usernames, nil
 }
 
+// GetPostLikes returns simple bool check if provided user liked provided post
+func (db *DBInterface) CheckUserLikedPost(postID int, userID int) (bool, error) {
+	rows, err := db.pool.Query(context.Background(),
+		`SELECT u.username FROM post_likes pl
+		 JOIN users u ON pl.user_id = u.id
+		 WHERE pl.post_id = $1 AND pl.user_id = $2`, postID, userID)
+	if err != nil {
+		return false, fmt.Errorf("failed to get likes: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var username string
+		if err := rows.Scan(&username); err != nil {
+			return false, fmt.Errorf("failed to scan username: %w", err)
+		}
+		return true, nil
+	}
+	return false, nil
+}
+
 type Comment struct {
 	ID        int        `json:"comment_id"`
 	Username  string     `json:"username"`
