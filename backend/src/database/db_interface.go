@@ -135,6 +135,7 @@ func (db *DBInterface) CreatePostFile(userID int, content string, latitude, long
 		userID, content, latitude, longitude, fileName)
 	if err != nil {
 		fmt.Println("here err in creating post file")
+		fmt.Println(err)
 		return fmt.Errorf("failed to create post: %w", err)
 	}
 	fmt.Println("here postera creating post file")

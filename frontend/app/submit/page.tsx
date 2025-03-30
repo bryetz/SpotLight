@@ -152,7 +152,7 @@ export default function SubmitPage() {
           reader.readAsDataURL(mediaFile);
         });
         
-        // Extract base64 data (remove data:image/jpeg;base64, prefix)
+        // Extract base64 data 
         mediaData = mediaData.split(',')[1];
         fileName = mediaFile.name;
       }

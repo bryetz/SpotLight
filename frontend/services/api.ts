@@ -107,10 +107,19 @@ export const deleteComment = (commentId: number) =>
 
 
 // File endpoint
-export const getFile = (params: {
-  userId: number,
-  postId: number,
-  fileName: string
-}) => api.get(`/api/file`, { params });
+export const getFile = async ({
+    userId,
+    postId,
+    fileName
+}: {
+    userId: number;
+    postId: number;
+    fileName: string;
+}) => {
+    return api.get('/api/file', {
+        params: { userId, postId, fileName },
+        responseType: 'arraybuffer'  // Important: tells axios to handle the response as binary data
+    });
+};
 
 export default api; 
