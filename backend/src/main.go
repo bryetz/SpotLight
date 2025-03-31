@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"SpotLight/backend/src/database"
 	"SpotLight/backend/src/handler"
@@ -22,10 +23,20 @@ func main() {
 	// Create file management system based on default relative path
 	fm := database.NewFileManager()
 
-	// Initialize the database
-	db, err := database.NewDBInterface()
+	// Initialize the database with retries
+	var db *database.DBInterface
+	var err error
+	maxRetries := 5
+	for i := 0; i < maxRetries; i++ {
+		db, err = database.NewDBInterface()
+		if err == nil {
+			break
+		}
+		log.Printf("Failed to connect to database (attempt %d/%d): %v", i+1, maxRetries, err)
+		time.Sleep(time.Second * 2)
+	}
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		log.Fatalf("Failed to connect to database after %d attempts: %v", maxRetries, err)
 	}
 	defer db.Close()
 
