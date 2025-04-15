@@ -4,15 +4,16 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { likePost, unlikePost, getComments, createComment, getFile, checkPostLiked, deleteComment } from '@/services/api';
+import { formatDistanceToNow, format, parseISO } from 'date-fns';
 
 interface ExpandedComments {
-  [key: number]: boolean;
+    [key: number]: boolean;
 }
 
 export function PostCard({ post }: { post: Post }) {
     const router = useRouter();
     const { userId, isAuthenticated, username } = useAuth();
-    
+
     const [likes, setLikes] = useState(post.like_count);
     const [liked, setLiked] = useState(false);
     const [comments, setComments] = useState<Comment[]>([]);
@@ -108,13 +109,13 @@ export function PostCard({ post }: { post: Post }) {
                 parent_id: parentId || undefined
             });
             console.log('Comment creation response:', response.data);
-            
+
             if (parentId) {
                 setReplyInput('');
             } else {
                 setCommentInput('');
             }
-            
+
             setReplyingTo(null);
             fetchComments();
         } catch (err) {
@@ -126,7 +127,7 @@ export function PostCard({ post }: { post: Post }) {
         try {
             setIsLoading(true);
             setError(null);
-            
+
             console.log('Requesting file:', {
                 userId: post.user_id,
                 postId: post.post_id,
@@ -142,13 +143,13 @@ export function PostCard({ post }: { post: Post }) {
             // Convert array buffer to base64
             const arrayBuffer = response.data;
             const base64 = arrayBufferToBase64(arrayBuffer);
-            
+
             // Determine content type from file extension
             const ext = post.file_name!.split('.').pop()?.toLowerCase();
             const isVideo = ['mp4', 'mov', 'quicktime'].includes(ext || '');
             const mimeType = isVideo ? 'video' : 'image';
             const dataUrl = `data:${mimeType}/${ext};base64,${base64}`;
-            
+
             setMediaData(dataUrl);
         } catch (error: any) {
             console.error('Error loading media:', error);
@@ -214,18 +215,13 @@ export function PostCard({ post }: { post: Post }) {
         const isOwnComment = comment.username === username;
 
         const formatDate = (dateString: string) => {
-            const date = new Date(dateString);
-            return date.toLocaleString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
+            const date = parseISO(dateString.replace('Z', ''));
+            return format(date, 'MMM d, h:mm a');
         };
 
         return (
-            <div 
-                key={comment.comment_id} 
+            <div
+                key={comment.comment_id}
                 className={`relative ${depth > 0 ? 'ml-4 mt-2' : 'mt-4'}`}
             >
                 {depth > 0 && (
@@ -254,7 +250,7 @@ export function PostCard({ post }: { post: Post }) {
                         )}
                     </div>
                     <p className="text-white/80 mt-1">{comment.content}</p>
-                    
+
                     <div className="flex items-center gap-4 mt-2">
                         <button
                             onClick={() => setReplyingTo(comment.comment_id)}
@@ -316,7 +312,7 @@ export function PostCard({ post }: { post: Post }) {
                     )}
 
                     {hasReplies && comment.replies && (
-                        <div 
+                        <div
                             className={`
                                 overflow-hidden transition-all duration-200 ease-in-out
                                 ${isExpanded ? 'max-h-[5000px] opacity-100' : 'max-h-0 opacity-0'}
@@ -381,12 +377,14 @@ export function PostCard({ post }: { post: Post }) {
                         {post.username}
                     </span>
                     <span className="mx-1.5">•</span>
-                    <span>{new Date(post.created_at).toLocaleDateString()}</span>
+                    <span>
+                        {format(parseISO(post.created_at.replace('Z', '')), 'MMM d, h:mm a')}
+                    </span>
                 </div>
             </div>
 
             <p className="text-[#d7dadc] mb-4 whitespace-pre-wrap">{post.content}</p>
-            
+
             {/* Media Display */}
             {post.file_name && (
                 <div className="mb-4">
@@ -401,13 +399,13 @@ export function PostCard({ post }: { post: Post }) {
                     ) : mediaData && (
                         <div className="relative">
                             {post.file_name.match(/\.(mp4|mov|quicktime)$/i) ? (
-                                <video 
+                                <video
                                     src={mediaData}
                                     controls
                                     className="w-full rounded-lg max-h-[512px] object-contain bg-black/40"
                                 />
                             ) : (
-                                <img 
+                                <img
                                     src={mediaData}
                                     alt="Post media"
                                     className="w-full rounded-lg max-h-[512px] object-contain bg-black/40"
@@ -417,7 +415,7 @@ export function PostCard({ post }: { post: Post }) {
                     )}
                 </div>
             )}
-            
+
             <div className="flex items-center text-xs text-[#818384] font-medium mb-4">
                 <MapPin className="w-3.5 h-3.5 mr-1" />
                 <span>
@@ -426,15 +424,15 @@ export function PostCard({ post }: { post: Post }) {
             </div>
 
             <div className="flex items-center space-x-4 pt-2 border-t border-[#343536]">
-                <button 
+                <button
                     onClick={handleLike}
                     className={`flex items-center space-x-1 text-sm ${liked ? 'text-red-400' : 'text-[#818384]'} hover:text-red-400 transition-colors`}
                 >
                     <Heart className={`w-4 h-4 ${liked ? 'fill-current' : ''}`} />
                     <span>{likes}</span>
                 </button>
-                
-                <button 
+
+                <button
                     onClick={() => {
                         setShowComments(!showComments);
                         if (!showComments) fetchComments();
@@ -444,8 +442,8 @@ export function PostCard({ post }: { post: Post }) {
                     <MessageCircle className="w-4 h-4" />
                     <span>{Array.isArray(comments) ? comments.length : 0}</span>
                 </button>
-                
-                <button 
+
+                <button
                     className="flex items-center space-x-1 text-sm text-[#818384] hover:text-white transition-colors ml-auto"
                 >
                     <Share2 className="w-4 h-4" />

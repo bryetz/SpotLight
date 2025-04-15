@@ -36,3 +36,19 @@
 //   }
 // }
 
+// Augment Cypress namespace to include custom commands
+declare namespace Cypress {
+	interface Chainable {
+	  login(username: string, password: string): void;
+	}
+  }
+  
+  // Custom command for login
+  Cypress.Commands.add('login', (username: string, password: string) => {
+	cy.visit('/login');
+	cy.get('input#username').type(username);
+	cy.get('input#password').type(password);
+	cy.contains('button', 'Sign In').click();
+	// Wait for login to complete and redirect
+	cy.url().should('not.include', '/login');
+  }); 
