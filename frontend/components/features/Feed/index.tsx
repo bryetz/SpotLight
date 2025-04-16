@@ -69,7 +69,7 @@ export function Feed() {
       <RadiusFilter 
         initialRadius={radius}
         minRadius={1000}
-        maxRadius={50000}
+        maxRadius={200000}
         onRadiusChange={handleRadiusChange}
         isOpen={showFilters}
       />
