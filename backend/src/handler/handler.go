@@ -214,6 +214,101 @@ func (h *RequestHandler) HandleGetPosts(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(posts)
 }
 
+func (h *RequestHandler) GetProfilePosts(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	postID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		http.Error(w, `{"message": "Invalid post ID"}`, http.StatusBadRequest)
+		return
+	}
+
+	posts, err := h.DB.GetUserPosts(postID)
+	if err != nil {
+		http.Error(w, `{"message": "Failed to get post"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(posts)
+}
+
+func (h *RequestHandler) GetSpecificPost(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	postID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		http.Error(w, `{"message": "Invalid post ID"}`, http.StatusBadRequest)
+		return
+	}
+
+	post, err := h.DB.GetPostById(postID)
+	if err != nil {
+		http.Error(w, `{"message": "Failed to get post"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(post)
+}
+
+func (h *RequestHandler) HandleSendDM(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		SenderID   int    `json:"sender_id"`
+		ReceiverID int    `json:"receiver_id"`
+		Content    string `json:"content"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"message": "Invalid payload"}`, http.StatusBadRequest)
+		return
+	}
+
+	err := h.DB.InsertMessage(req.SenderID, req.ReceiverID, req.Content)
+	if err != nil {
+		http.Error(w, `{"message": "Failed to send message"}`, http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]string{"message": "Message sent"})
+}
+func (h *RequestHandler) HandleGetDMHistory(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	senderID, _ := strconv.Atoi(query.Get("sender_id"))
+	receiverID, _ := strconv.Atoi(query.Get("receiver_id"))
+
+	messages, err := h.DB.GetMessages(senderID, receiverID)
+	if err != nil {
+		http.Error(w, `{"message": "Failed to fetch messages"}`, http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(messages)
+}
+
+func (h *RequestHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+	userID, _ := strconv.Atoi(r.URL.Query().Get("user_id"))
+
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		http.Error(w, "WebSocket upgrade failed", http.StatusInternalServerError)
+		return
+	}
+
+	client := &WSClient{userID: userID, conn: conn}
+	Hub.register <- client
+
+	for {
+		var msg WSMessage
+		err := conn.ReadJSON(&msg)
+		if err != nil {
+			break
+		}
+		h.DB.InsertMessage(msg.From, msg.To, msg.Content) // Save to DB
+		Hub.broadcast <- msg
+	}
+
+	Hub.unregister <- userID
+}
+
 // HandleDeletePost removes a post by ID
 func (h *RequestHandler) HandleDeletePost(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)

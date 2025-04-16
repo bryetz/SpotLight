@@ -209,6 +209,112 @@ func (db *DBInterface) GetPosts(reqLatitude float64, reqLongitude float64, dista
 	return posts, nil
 }
 
+// function to get post data from a specific post id
+func (db *DBInterface) GetUserPosts(userId int) ([]map[string]interface{}, error) {
+	var posts []map[string]interface{}
+	row, err := db.pool.Query(context.Background(), "SELECT * FROM posts WHERE user_id = $1", userId)
+	if err != nil {
+		return posts, fmt.Errorf("failed to get last user post from ID %d: %w", userId, err)
+	}
+
+	for row.Next() {
+		var postID int
+		var userID int
+		var username, content, filename string
+		var latitude, longitude float64
+		var createdAt time.Time
+		var likeCount int
+		if err := row.Scan(&postID, &userID, &username, &content, &latitude, &longitude, &createdAt, &filename, &likeCount); err != nil {
+			log.Printf("Error scanning post row: %v", err)
+			return posts, err
+		}
+		posts = append(posts, map[string]interface{}{
+			"post_id":    postID,
+			"user_id":    userID,
+			"username":   username,
+			"content":    content,
+			"latitude":   latitude,
+			"longitude":  longitude,
+			"created_at": createdAt.Format(time.RFC3339),
+			"file_name":  filename,
+			"like_count": likeCount,
+		})
+	}
+	return posts, nil
+}
+
+// function to get post data from a specific post id
+func (db *DBInterface) GetPostById(postId int) (map[string]interface{}, error) {
+	var post map[string]interface{}
+	row, err := db.pool.Query(context.Background(), "SELECT * FROM posts WHERE id = $1", postId)
+	if err != nil {
+		return post, fmt.Errorf("failed to get last user post from ID %d: %w", postId, err)
+	}
+
+	for row.Next() {
+		var postID int
+		var userID int
+		var username, content, filename string
+		var latitude, longitude float64
+		var createdAt time.Time
+		var likeCount int
+		if err := row.Scan(&postID, &userID, &username, &content, &latitude, &longitude, &createdAt, &filename, &likeCount); err != nil {
+			log.Printf("Error scanning post row: %v", err)
+			return post, err
+		}
+		post = map[string]interface{}{
+			"post_id":    postID,
+			"user_id":    userID,
+			"username":   username,
+			"content":    content,
+			"latitude":   latitude,
+			"longitude":  longitude,
+			"created_at": createdAt.Format(time.RFC3339),
+			"file_name":  filename,
+			"like_count": likeCount,
+		}
+	}
+	return post, nil
+}
+
+func (db *DBInterface) InsertMessage(senderID, receiverID int, content string) error {
+	_, err := db.pool.Exec(context.Background(),
+		"INSERT INTO messages (sender_id, receiver_id, content) VALUES ($1, $2, $3)",
+		senderID, receiverID, content)
+	return err
+}
+
+func (db *DBInterface) GetMessages(senderID, receiverID int) ([]map[string]interface{}, error) {
+	rows, err := db.pool.Query(context.Background(), `
+		SELECT id, sender_id, receiver_id, content, created_at 
+		FROM messages 
+		WHERE (sender_id=$1 AND receiver_id=$2) OR (sender_id=$2 AND receiver_id=$1)
+		ORDER BY created_at ASC`, senderID, receiverID)
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []map[string]interface{}
+	for rows.Next() {
+		var id, sID, rID int
+		var content string
+		var createdAt time.Time
+		if err := rows.Scan(&id, &sID, &rID, &content, &createdAt); err != nil {
+			continue
+		}
+		messages = append(messages, map[string]interface{}{
+			"id":          id,
+			"sender_id":   sID,
+			"receiver_id": rID,
+			"content":     content,
+			"created_at":  createdAt.Format(time.RFC3339),
+		})
+	}
+	return messages, nil
+}
+
 // helper function to get last postId from userId
 func (db *DBInterface) GetLastPostByUser(userId int) (int, error) {
 	row, err := db.pool.Query(context.Background(), "SELECT * FROM posts WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1", userId)
