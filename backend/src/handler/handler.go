@@ -214,6 +214,24 @@ func (h *RequestHandler) HandleGetPosts(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(posts)
 }
 
+func (h *RequestHandler) GetProfilePosts(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	postID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		http.Error(w, `{"message": "Invalid post ID"}`, http.StatusBadRequest)
+		return
+	}
+
+	posts, err := h.DB.GetUserPosts(postID)
+	if err != nil {
+		http.Error(w, `{"message": "Failed to get post"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(posts)
+}
+
 func (h *RequestHandler) GetSpecificPost(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	postID, err := strconv.Atoi(vars["id"])
