@@ -210,6 +210,40 @@ func (db *DBInterface) GetPosts(reqLatitude float64, reqLongitude float64, dista
 }
 
 // helper function to get last postId from userId
+func (db *DBInterface) GetPostById(postId int) (map[string]interface{}, error) {
+	var post map[string]interface{}
+	row, err := db.pool.Query(context.Background(), "SELECT * FROM posts WHERE id = $1", postId)
+	if err != nil {
+		return post, fmt.Errorf("failed to get last user post from ID %d: %w", postId, err)
+	}
+
+	for row.Next() {
+		var postID int
+		var userID int
+		var username, content, filename string
+		var latitude, longitude float64
+		var createdAt time.Time
+		var likeCount int
+		if err := row.Scan(&postID, &userID, &username, &content, &latitude, &longitude, &createdAt, &filename, &likeCount); err != nil {
+			log.Printf("Error scanning post row: %v", err)
+			return post, err
+		}
+		post = map[string]interface{}{
+			"post_id":    postID,
+			"user_id":    userID,
+			"username":   username,
+			"content":    content,
+			"latitude":   latitude,
+			"longitude":  longitude,
+			"created_at": createdAt.Format(time.RFC3339),
+			"file_name":  filename,
+			"like_count": likeCount,
+		}
+	}
+	return post, nil
+}
+
+// helper function to get last postId from userId
 func (db *DBInterface) GetLastPostByUser(userId int) (int, error) {
 	row, err := db.pool.Query(context.Background(), "SELECT * FROM posts WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1", userId)
 	if err != nil {
