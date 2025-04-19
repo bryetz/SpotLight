@@ -2,6 +2,7 @@ import { Post, Comment } from '@/types/post';
 import { MapPin, MessageCircle, Heart, Share2, Loader2, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState, useEffect, MouseEvent, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { likePost, unlikePost, getComments, createComment, getFile, checkPostLiked, deleteComment, deletePost as apiDeletePost } from '@/services/api';
 import { formatDistanceToNow, format, parseISO } from 'date-fns';
@@ -331,7 +332,13 @@ export function PostCard({ post, isClickable = true, onDelete }: PostCardProps) 
                 )}
                 <div className={`pl-4 transition-all duration-200 ease-in-out ${isExpanded ? 'opacity-100' : 'opacity-60'}`}>
                     <div className="flex items-center gap-2">
-                        <span className="font-medium text-white/90">{comment.username}</span>
+                        <Link 
+                            href={`/profile/${comment.user_id}`} 
+                            onClick={(e) => e.stopPropagation()} 
+                            className="font-medium text-white/90 hover:underline"
+                        >
+                            {comment.username}
+                        </Link>
                         <span className="text-[#818384] text-xs">
                             {formatDate(comment.created_at)}
                         </span>
@@ -487,9 +494,13 @@ export function PostCard({ post, isClickable = true, onDelete }: PostCardProps) 
             
             <div className="flex items-center mb-3">
                 <div className="flex items-center text-sm text-[#818384]">
-                    <span className="font-medium text-white/90">
+                    <Link 
+                        href={`/profile/${post.user_id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="font-medium text-white/90 hover:underline"
+                    >
                         {post.username}
-                    </span>
+                    </Link>
                     <span className="mx-1.5">•</span>
                     <span>
                         {format(parseISO(post.created_at.replace('Z', '')), 'MMM d, h:mm a')}

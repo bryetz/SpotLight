@@ -7,19 +7,12 @@ import { User, ChevronDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export function Header() {
-  const { isAuthenticated, username, login, logout } = useAuth();
+  const { isAuthenticated, username, userId, login, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
   useEffect(() => {
-    // Check for existing auth token on mount
-    const token = localStorage.getItem('authToken');
-    const storedUsername = localStorage.getItem('username');
-    if (token && storedUsername && !isAuthenticated) {
-      login(storedUsername, token, 1); // TODO: remove this, this is placeholder because there is no user id in the database yet
-    }
-
     // Close menu when clicking outside
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -41,7 +34,11 @@ export function Header() {
 
   const handleProfileClick = () => {
     setIsMenuOpen(false);
-    router.push('/profile');
+    if (userId) {
+      router.push(`/profile/${userId}`);
+    } else {
+      console.error('User ID not available for profile navigation');
+    }
   };
 
   const handleCreateClick = () => {
