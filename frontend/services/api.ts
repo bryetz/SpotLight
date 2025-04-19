@@ -63,10 +63,13 @@ export const getPosts = async (params?: {
     console.log(`/api/posts?latitude=${reqLatitude}&longitude=${reqLongitude}&distance=${distance}`);
     return api.get(`/api/posts?latitude=${reqLatitude}&longitude=${reqLongitude}&distance=${distance}`)
   } catch (error) {
-    console.error(error);
+    console.error("Geolocation failed or not available:", error);
     return api.get(`/api/posts?latitude=${reqLatitude}&longitude=${reqLongitude}&distance=${distance}`)
   }
 }
+
+export const getPostById = (postId: number) =>
+  api.get(`/api/posts/${postId}`);
 
 export const createPost = (data: {
   user_id: number,
@@ -77,7 +80,7 @@ export const createPost = (data: {
   longitude: number 
 }) => api.post('/api/posts', data);
 
-export const deletePost = (postId: string) =>  // ts prolly dont work because idk if its param based or req based
+export const deletePost = (postId: number) => 
   api.delete(`/api/posts/${postId}`);
 
 

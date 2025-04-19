@@ -29,7 +29,35 @@ jest.mock('lucide-react', () => ({
   X: () => <div>Close</div>
 }));
 
-describe('SubmitPage', () => {
+describe('TestSubmitPage', () => {
+  // Set up mock implementations
+  const mockPush = jest.fn();
+  const mockBack = jest.fn();
+  
+  // Mock fetch for reverse geocoding
+  const mockFetchResponse = {
+    json: jest.fn().mockResolvedValue({
+      display_name: '123 Main St, Anytown, USA',
+      address: {
+        city: 'Anytown',
+        state: 'State'
+      }
+    })
+  };
+  global.fetch = jest.fn().mockResolvedValue(mockFetchResponse);
+  
+  // Mock geolocation
+  const mockGeolocation = {
+    getCurrentPosition: jest.fn().mockImplementation(success => 
+      success({
+        coords: {
+          latitude: 40.7128,
+          longitude: -74.0060
+        }
+      })
+    )
+  };
+  
   beforeEach(() => {
     // Mock geolocation
     const mockGeolocation = {
