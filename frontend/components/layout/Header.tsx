@@ -63,7 +63,7 @@ export function Header() {
           {isAuthenticated ? (
             <>
               <button 
-			  	className="px-4 py-1.5 bg-white hover:bg-gray-200 text-[#000000] text-xs font-medium rounded-[4px] transition-colors duration-300"
+			  	className="px-4 py-1.5 bg-white hover:bg-gray-200 text-[#000000] text-xs font-medium rounded-[4px] transition-colors duration-100"
 				onClick={handleCreateClick}
 			  >
                 Create
@@ -74,10 +74,10 @@ export function Header() {
                   className="flex items-center space-x-1 p-1 hover:bg-white/5 rounded-md transition-colors"
                 >
                   <User className="w-5 h-5 text-white" />
-                  <ChevronDown className={`w-4 h-4 text-white transition-transform duration-200 ${isMenuOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-4 h-4 text-white transition-transform duration-100 ${isMenuOpen ? 'rotate-180' : ''}`} />
                 </button>
 
-                <div className={`absolute right-0 mt-2 w-48 bg-black/20 backdrop-blur-[4px] border border-[#343536] rounded-lg shadow-lg overflow-hidden transition-all duration-200 origin-top-right ${isMenuOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`}>
+                <div className={`absolute right-0 mt-2 w-48 bg-black/20 backdrop-blur-[4px] border border-[#343536] rounded-lg shadow-lg overflow-hidden transition-all duration-100 origin-top-right ${isMenuOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`}>
                   <div 
                     onClick={handleProfileClick}
                     className="px-3 py-2 border-b border-[#343536] cursor-pointer transition-colors"
