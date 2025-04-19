@@ -3,7 +3,7 @@
 import { Post } from '@/types/post';
 import { PostCard } from '@/components/features/Post/PostCard';
 import { SlidersHorizontal, Loader2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { getPosts } from '@/services/api';
 import { RadiusFilter } from './RadiusFilter';
 
@@ -14,33 +14,42 @@ export function Feed() {
   const [radius, setRadius] = useState<number>(25000); // Default 25km
   const [showFilters, setShowFilters] = useState<boolean>(false);
 
-  const fetchPosts = async (searchRadius: number) => {
+  const fetchPosts = useCallback(async (searchRadius: number) => {
     setIsLoading(true);
+    setError(null);
     try {
       const response = await getPosts({ radius: searchRadius });
       
       console.log('Posts received:', response.data);
-      setPosts(response.data || []); // Ensure we always set an array
+      setPosts(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Error fetching posts:', error);
-      setError('Failed to fetch posts');
-      setPosts([]); // Set empty array on error
+      let errorMessage = 'Failed to fetch posts';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      setError(errorMessage);
+      setPosts([]);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchPosts(radius);
-  }, []);
+  }, [fetchPosts, radius]);
 
   const handleRadiusChange = (newRadius: number) => {
     setRadius(newRadius);
-    fetchPosts(newRadius);
   };
 
   const toggleFilters = () => {
     setShowFilters(!showFilters);
+  };
+
+  const handlePostDeleted = (deletedPostId: number) => {
+    setPosts(currentPosts => currentPosts.filter(post => post.post_id !== deletedPostId));
+    console.log(`Removed post ${deletedPostId} from feed state.`);
   };
 
   if (error) {
@@ -80,12 +89,17 @@ export function Feed() {
         </div>
       ) : posts.length === 0 ? (
         <div className="bg-black/20 backdrop-blur-[4px] border border-[#343536] rounded-lg p-6">
-          <p className="text-[#818384] text-center">No posts yet</p>
+          <p className="text-[#818384] text-center">No posts found matching the criteria.</p>
         </div>
       ) : (
         <div className="space-y-4">
           {posts.map((post) => (
-            <PostCard key={post.post_id} post={post} />
+            <PostCard 
+              key={post.post_id} 
+              post={post} 
+              isClickable={true}
+              onDelete={handlePostDeleted}
+            />
           ))}
         </div>
       )}
