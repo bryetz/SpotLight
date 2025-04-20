@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	"mime"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 	"SpotLight/backend/src/database"
 
 	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
 )
 
 // RequestHandler manages API requests
@@ -304,24 +306,55 @@ func (h *RequestHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request)
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		http.Error(w, "WebSocket upgrade failed", http.StatusInternalServerError)
+		log.Printf("WebSocket upgrade failed for user %d: %v\n", userID, err)
+		
 		return
 	}
 
 	client := &WSClient{userID: userID, conn: conn}
 	Hub.register <- client
 
+	// connection closure and unregistration on function exit
+	defer func() {
+		Hub.unregister <- userID
+		conn.Close()
+		log.Printf("WebSocket connection closed for user %d", userID)
+	}()
+
+	log.Printf("WebSocket connection opened for user %d", userID)
+
 	for {
+		log.Printf("Attempting to read JSON from WebSocket for user %d...", userID)
 		var msg WSMessage
 		err := conn.ReadJSON(&msg)
 		if err != nil {
-			break
+			log.Printf("WebSocket read error for user %d: %v\n", userID, err)
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Printf("WebSocket specific close error for user %d: %v\n", userID, err)
+			}
+			break // Exit loop on read error or close
 		}
-		h.DB.InsertMessage(msg.From, msg.To, msg.Content) // Save to DB
+		// Add sender ID if missing (it should be the connected user)
+		if msg.From == 0 {
+			msg.From = userID
+		}
+
+		// Basic validation
+		if msg.To == 0 || msg.Content == "" {
+			log.Printf("Received invalid WebSocket message from user %d: %+v", userID, msg)
+			continue // Skip invalid messages
+		}
+
+		log.Printf("Received WebSocket message from %d to %d", msg.From, msg.To)
+
+		err = h.DB.InsertMessage(msg.From, msg.To, msg.Content) // Save to DB
+		if err != nil {
+			log.Printf("Failed to save DM to database from %d to %d: %v", msg.From, msg.To, err)
+		}
 		Hub.broadcast <- msg
 	}
 
-	Hub.unregister <- userID
+	// Note: The defer function handles unregistering and closing the connection
 }
 
 // HandleDeletePost removes a post by ID

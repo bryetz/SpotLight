@@ -133,4 +133,11 @@ export const checkPostLiked = (postId: number, userId: number) =>
 export const getProfile = (userId: number) => 
   api.get(`/api/profile/${userId}`);
 
+// DM endpoints
+export const sendDM = (sender_id: number, receiver_id: number, content: string) =>
+  api.post('/api/dm/send', { sender_id, receiver_id, content });
+
+export const getDMHistory = (sender_id: number, receiver_id: number) =>
+  api.get('/api/dm/history', { params: { sender_id, receiver_id } });
+
 export default api; 
