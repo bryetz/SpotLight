@@ -216,20 +216,34 @@ func (h *RequestHandler) HandleGetPosts(w http.ResponseWriter, r *http.Request) 
 
 func (h *RequestHandler) GetProfilePosts(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	postID, err := strconv.Atoi(vars["id"])
+	userID, err := strconv.Atoi(vars["id"])
 	if err != nil {
-		http.Error(w, `{"message": "Invalid post ID"}`, http.StatusBadRequest)
+		http.Error(w, `{"message": "Invalid user ID"}`, http.StatusBadRequest)
 		return
 	}
 
-	posts, err := h.DB.GetUserPosts(postID)
+	// Call the updated DB function
+	userProfile, posts, err := h.DB.GetUserPosts(userID)
 	if err != nil {
-		http.Error(w, `{"message": "Failed to get post"}`, http.StatusInternalServerError)
+		// Check if the error is specifically "user not found"
+		if err.Error() == fmt.Sprintf("user not found: failed to query user profile for ID %d", userID) || 
+		   (err.Error() == "user not found: no rows in result set" && len(posts) == 0) {
+			http.Error(w, `{"message": "User not found"}`, http.StatusNotFound)
+		} else {
+			http.Error(w, fmt.Sprintf(`{"message": "Failed to get profile data: %v"}`, err), http.StatusInternalServerError)
+		}
 		return
 	}
 
+	// Structure the response
+	response := map[string]interface{}{
+		"user":  userProfile,
+		"posts": posts,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(posts)
+	json.NewEncoder(w).Encode(response)
 }
 
 func (h *RequestHandler) GetSpecificPost(w http.ResponseWriter, r *http.Request) {
@@ -270,6 +284,7 @@ func (h *RequestHandler) HandleSendDM(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(map[string]string{"message": "Message sent"})
 }
+
 func (h *RequestHandler) HandleGetDMHistory(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	senderID, _ := strconv.Atoi(query.Get("sender_id"))
