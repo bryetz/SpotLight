@@ -1,11 +1,19 @@
 // Optional: configure or set up a testing framework before each test
 import '@testing-library/jest-dom' 
 
-// Add a mock for ResizeObserver
+// Mock ResizeObserver (if needed by components)
 class ResizeObserver {
   observe() {}
   unobserve() {}
   disconnect() {}
 }
 
-window.ResizeObserver = ResizeObserver; 
+// Mock IntersectionObserver (needed for components using it, e.g., for infinite scroll)
+class IntersectionObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+window.ResizeObserver = ResizeObserver;
+window.IntersectionObserver = IntersectionObserver; // Assign the mock to the window object 
