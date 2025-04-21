@@ -1,10 +1,13 @@
 # SpotLight
 
+![App in Action](Preview_Filter_Image.png "Filter Image")
+![App in Action](Preview_Image.png "Preview Image")
+
 ## About
 
-A geolocation-based platform for sharing and discovering posts tied to places around you.
+A geolocation-based platform for sharing and discovering posts tied to places around you. It's a social media app where users share updates, memes, and media to friends in their area!
 
-## How To Build
+## How to Build and Run
 
 ### For the backend:
 * ```cd backend```
@@ -16,7 +19,12 @@ A geolocation-based platform for sharing and discovering posts tied to places ar
 * ```npm install```
 * ```npm run dev```
 
-### For running frontend tests:
+## For Running Backend Tests:
+#### All Unit Tests:
+* ```cd backend/testing/backend```
+* ```go test .```
+
+## For running Frontend Tests:
 #### Unit Tests:
 * ```cd frontend```
 * ```npm test```
