@@ -28,7 +28,7 @@ func setupLikeTest(t *testing.T) (*database.DBInterface, *handler.RequestHandler
 		t.Fatalf("Failed to create test post: %v", err)
 	}
 
-	posts, err := db.GetPosts(0, 0, math.MaxInt)
+	posts, err := db.GetPosts(0, 0, math.MaxInt32, 20, 0, "", "")
 	if err != nil || len(posts) == 0 {
 		t.Fatalf("Failed to retrieve posts: %v", err)
 	}

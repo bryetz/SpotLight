@@ -151,14 +151,13 @@ func (db *DBInterface) CreatePostFile(userID int, content string, latitude, long
 		fmt.Println(err)
 		return fmt.Errorf("failed to create post: %w", err)
 	}
-	fmt.Println("here postera creating post file")
 
 	return nil
 }
 
 // GetPosts retrieves posts with optional filtering and pagination
-func (db *DBInterface) GetPosts(reqLatitude float64, reqLongitude float64, distance int, 
-                                limit int, offset int, sortOrder string, timeFilter string) ([]map[string]interface{}, error) {
+func (db *DBInterface) GetPosts(reqLatitude float64, reqLongitude float64, distance int,
+	limit int, offset int, sortOrder string, timeFilter string) ([]map[string]interface{}, error) {
 	if distance < 0 {
 		distance = 25000 // Default distance if not provided or invalid
 	}
@@ -201,7 +200,7 @@ func (db *DBInterface) GetPosts(reqLatitude float64, reqLongitude float64, dista
 		whereClauses = append(whereClauses, fmt.Sprintf("p.created_at >= DATE_TRUNC('month', $%d::timestamp)", paramIndex))
 		args = append(args, now)
 		paramIndex++
-	// "all" is default, no time clause needed
+		// "all" is default, no time clause needed
 	}
 
 	if len(whereClauses) > 0 {
@@ -215,7 +214,7 @@ func (db *DBInterface) GetPosts(reqLatitude float64, reqLongitude float64, dista
 	case "top":
 		queryBuilder.WriteString("p.like_count DESC, p.created_at DESC")
 	// case "hot": // Placeholder for future hot sort implementation
-	// 	 queryBuilder.WriteString("...") 
+	// 	 queryBuilder.WriteString("...")
 	case "new":
 		fallthrough // Explicit fallthrough for clarity
 	default: // Default to new
@@ -263,9 +262,9 @@ func (db *DBInterface) GetPosts(reqLatitude float64, reqLongitude float64, dista
 		})
 	}
 
-	 if err := rows.Err(); err != nil {
-        return nil, fmt.Errorf("error iterating post results: %w", err)
-    }
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating post results: %w", err)
+	}
 
 	return posts, nil
 }
@@ -377,9 +376,9 @@ func (db *DBInterface) GetPostById(postId int) (map[string]interface{}, error) {
 		}
 	} else {
 		if err := rows.Err(); err != nil {
-            log.Printf("Error iterating rows for post ID %d: %v", postId, err)
-            return nil, fmt.Errorf("error retrieving post data for ID %d: %w", postId, err)
-        }
+			log.Printf("Error iterating rows for post ID %d: %v", postId, err)
+			return nil, fmt.Errorf("error retrieving post data for ID %d: %w", postId, err)
+		}
 		return nil, fmt.Errorf("post with ID %d not found", postId)
 	}
 
@@ -388,10 +387,10 @@ func (db *DBInterface) GetPostById(postId int) (map[string]interface{}, error) {
 		log.Printf("Warning: Multiple posts found for ID %d", postId)
 	}
 
-    if err := rows.Err(); err != nil {
-        log.Printf("Error after iterating rows for post ID %d: %v", postId, err)
-        return nil, fmt.Errorf("error completing retrieval for post ID %d: %w", postId, err)
-    }
+	if err := rows.Err(); err != nil {
+		log.Printf("Error after iterating rows for post ID %d: %v", postId, err)
+		return nil, fmt.Errorf("error completing retrieval for post ID %d: %w", postId, err)
+	}
 
 	return post, nil
 }
@@ -613,11 +612,11 @@ func (db *DBInterface) GetNestedComments(postID int) ([]*Comment, error) {
 		c.ParentID = parentID
 		commentMap[c.ID] = &c
 	}
-	
+
 	if err := rows.Err(); err != nil {
-        log.Printf("Error iterating comment rows: %v", err)
-        return nil, err
-    }
+		log.Printf("Error iterating comment rows: %v", err)
+		return nil, err
+	}
 
 	for _, comment := range commentMap {
 		if comment.ParentID != nil {
@@ -654,7 +653,7 @@ func (db *DBInterface) SearchUsers(query string, limit int) ([]UserProfile, erro
 		WHERE username ILIKE $1 
 		ORDER BY username ASC 
 		LIMIT $2`
-	
+
 	rows, err := db.pool.Query(context.Background(), sqlQuery, "%"+query+"%", limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search users: %w", err)
@@ -666,15 +665,15 @@ func (db *DBInterface) SearchUsers(query string, limit int) ([]UserProfile, erro
 		var createdAt time.Time
 		if err := rows.Scan(&user.UserID, &user.Username, &createdAt); err != nil {
 			log.Printf("Error scanning user row during search: %v", err)
-			continue 
+			continue
 		}
 		user.CreatedAt = createdAt.Format(time.RFC3339) // Format timestamp
 		users = append(users, user)
 	}
 
 	if err := rows.Err(); err != nil {
-        return nil, fmt.Errorf("error iterating user search results: %w", err)
-    }
+		return nil, fmt.Errorf("error iterating user search results: %w", err)
+	}
 
 	return users, nil
 }
@@ -723,8 +722,8 @@ func (db *DBInterface) SearchPosts(query string, limit int) ([]map[string]interf
 	}
 
 	if err := rows.Err(); err != nil {
-        return nil, fmt.Errorf("error iterating post search results: %w", err)
-    }
+		return nil, fmt.Errorf("error iterating post search results: %w", err)
+	}
 
 	return posts, nil
 }
