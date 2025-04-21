@@ -19,6 +19,13 @@ type DBInterface struct {
 	pool *pgxpool.Pool
 }
 
+// UserProfile holds public user information
+type UserProfile struct {
+	UserID    int    `json:"user_id"`
+	Username  string `json:"username"`
+	CreatedAt string `json:"created_at"`
+}
+
 // NewDBInterface initializes the database connection
 func NewDBInterface() (*DBInterface, error) {
 	err := godotenv.Load()
@@ -207,6 +214,70 @@ func (db *DBInterface) GetPosts(reqLatitude float64, reqLongitude float64, dista
 	}
 
 	return posts, nil
+}
+
+// GetUserPosts gets profile info and all posts from a specific user
+func (db *DBInterface) GetUserPosts(userId int) (UserProfile, []map[string]interface{}, error) {
+	var userProfile UserProfile
+	var posts []map[string]interface{}
+
+	// 1. Get User Profile Info
+	var createdAt time.Time
+	err := db.pool.QueryRow(context.Background(),
+		"SELECT id, username, created_at FROM users WHERE id = $1", userId).Scan(
+		&userProfile.UserID, &userProfile.Username, &createdAt)
+	if err != nil {
+		log.Printf("Failed to get user profile for ID %d: %v", userId, err)
+		return userProfile, posts, fmt.Errorf("user not found: %w", err)
+	}
+	userProfile.CreatedAt = createdAt.Format(time.RFC3339)
+
+	// 2. Get User Posts
+	query := `
+		SELECT p.id, p.user_id, u.username, p.content, p.latitude, p.longitude, p.created_at, p.file_name, p.like_count
+		FROM posts p
+		JOIN users u ON p.user_id = u.id
+		WHERE p.user_id = $1
+		ORDER BY p.created_at DESC`
+
+	rows, err := db.pool.Query(context.Background(), query, userId)
+	if err != nil {
+		log.Printf("Failed to get posts for user ID %d: %v", userId, err)
+		return userProfile, posts, fmt.Errorf("failed to retrieve posts for user ID %d: %w", userId, err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var postID int
+		var postUserID int // Renamed to avoid conflict with outer userId
+		var username, content, filename string
+		var latitude, longitude float64
+		var postCreatedAt time.Time // Renamed for clarity
+		var likeCount int
+
+		if err := rows.Scan(&postID, &postUserID, &username, &content, &latitude, &longitude, &postCreatedAt, &filename, &likeCount); err != nil {
+			log.Printf("Error scanning post row for user ID %d: %v", userId, err)
+			continue
+		}
+		posts = append(posts, map[string]interface{}{
+			"post_id":    postID,
+			"user_id":    postUserID, // Use the scanned user ID
+			"username":   username,   // Use the scanned username
+			"content":    content,
+			"latitude":   latitude,
+			"longitude":  longitude,
+			"created_at": postCreatedAt.Format(time.RFC3339), // Use the scanned time
+			"file_name":  filename,
+			"like_count": likeCount,
+		})
+	}
+
+	if err := rows.Err(); err != nil {
+		log.Printf("Error iterating through post rows for user ID %d: %v", userId, err)
+		return userProfile, posts, fmt.Errorf("error processing posts for user ID %d: %w", userId, err)
+	}
+
+	return userProfile, posts, nil
 }
 
 // GetPostById gets a post by ID
@@ -414,6 +485,7 @@ func (db *DBInterface) CheckUserLikedPost(postID int, userID int) (bool, error) 
 
 type Comment struct {
 	ID        int        `json:"comment_id"`
+	UserID    int        `json:"user_id"`
 	Username  string     `json:"username"`
 	Content   string     `json:"content"`
 	CreatedAt string     `json:"created_at"`
@@ -424,7 +496,7 @@ type Comment struct {
 // GetNestedComments returns comments on a post and all their replies
 func (db *DBInterface) GetNestedComments(postID int) ([]*Comment, error) {
 	rows, err := db.pool.Query(context.Background(), `
-		SELECT c.id, u.username, c.content, c.created_at, c.parent_id
+		SELECT c.id, c.user_id, u.username, c.content, c.created_at, c.parent_id
 		FROM comments c
 		JOIN users u ON c.user_id = u.id
 		WHERE c.post_id = $1
@@ -441,13 +513,19 @@ func (db *DBInterface) GetNestedComments(postID int) ([]*Comment, error) {
 		var c Comment
 		var createdAt time.Time
 		var parentID *int
-		if err := rows.Scan(&c.ID, &c.Username, &c.Content, &createdAt, &parentID); err != nil {
+		if err := rows.Scan(&c.ID, &c.UserID, &c.Username, &c.Content, &createdAt, &parentID); err != nil {
+			log.Printf("Error scanning comment row: %v", err)
 			continue
 		}
 		c.CreatedAt = createdAt.Format(time.RFC3339)
 		c.ParentID = parentID
 		commentMap[c.ID] = &c
 	}
+	
+	if err := rows.Err(); err != nil {
+        log.Printf("Error iterating comment rows: %v", err)
+        return nil, err
+    }
 
 	for _, comment := range commentMap {
 		if comment.ParentID != nil {

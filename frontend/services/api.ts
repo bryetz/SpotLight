@@ -129,4 +129,8 @@ export const getFile = async ({
 export const checkPostLiked = (postId: number, userId: number) =>
   api.get(`/api/posts/${postId}/liked`, { params: { userId } });
 
+// Get user profile and posts
+export const getProfile = (userId: number) => 
+  api.get(`/api/profile/${userId}`);
+
 export default api; 

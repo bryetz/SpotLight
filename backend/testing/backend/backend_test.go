@@ -65,6 +65,15 @@ func cleanupTestDataAll(db *database.DBInterface, fm *database.FileManager, user
 		if err != nil {
 			t.Logf("Warning: Failed to delete test user folder: %v", err)
 		}
+		// second user if it exists
+		err = db.DeleteUser("testUser2")
+		if err != nil {
+			t.Logf("Warning: Failed to delete test user: %v", err)
+		}
+		err = fm.DeleteUserFolder("testUser2")
+		if err != nil {
+			t.Logf("Warning: Failed to delete test user folder: %v", err)
+		}
 	}
 }
 
@@ -484,4 +493,249 @@ func TestGetPostFileEndpoint(t *testing.T) {
 	if fileRec.Code != http.StatusOK {
 		t.Errorf("Expected status code 200, got %d", fileRec.Code)
 	}
+}
+
+func TestGetPostByIdEndpoint(t *testing.T) {
+	db, userCreated := setupTestDB(t)
+	fm := database.NewFileManagerPath("../../../data") // example of creating fm with different folder path
+	defer db.Close()
+	//defer cleanupTestData(db, userCreated, t)
+	// sometimes you want to keep files to see them appear in dir list
+	defer cleanupTestDataAll(db, fm, userCreated, t)
+
+	if err := db.Register("testUser", "password"); err != nil {
+		t.Fatalf("Failed to register user: %v", err)
+	}
+	*userCreated = true
+
+	// Authenticate and retrieve user ID
+	userID, err := db.Authenticate("testUser", "password")
+	if err != nil {
+		t.Fatalf("Failed to log in: %v", err)
+	}
+
+	// Prepare post request
+	postBody, err := json.Marshal(map[string]interface{}{
+		"user_id":   userID,
+		"content":   "Test post 1",
+		"file_name": "",
+		"media":     "",
+		"latitude":  37.7749,
+		"longitude": -122.4194,
+	})
+	if err != nil {
+		t.Fatalf("Failed to marshal JSON: %v", err)
+	}
+
+	req := httptest.NewRequest("POST", "/api/posts", bytes.NewBuffer(postBody))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handlerInstance := handler.RequestHandler{DB: db, FM: fm}
+	handlerInstance.HandleCreatePost(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Errorf("Expected status 201, got %d", rec.Code)
+	}
+
+	// Prepare 2nd post request
+	postBody, err = json.Marshal(map[string]interface{}{
+		"user_id":   userID,
+		"content":   "Test post 2",
+		"file_name": "",
+		"media":     "",
+		"latitude":  37.7749,
+		"longitude": -122.4194,
+	})
+	if err != nil {
+		t.Fatalf("Failed to marshal JSON: %v", err)
+	}
+
+	req = httptest.NewRequest("POST", "/api/posts", bytes.NewBuffer(postBody))
+	req.Header.Set("Content-Type", "application/json")
+	rec = httptest.NewRecorder()
+
+	handlerInstance.HandleCreatePost(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Errorf("Expected status 201, got %d", rec.Code)
+	}
+
+	// now get list of posts generally
+
+	// Retrieve posts to get the ID of the newly created post
+	getReq := httptest.NewRequest("GET", "/api/posts", nil)
+	getRec := httptest.NewRecorder()
+	handlerInstance.HandleGetPosts(getRec, getReq)
+
+	var posts []map[string]interface{}
+	err = json.NewDecoder(getRec.Body).Decode(&posts)
+	if err != nil {
+		t.Fatalf("Failed to decode posts JSON: %v", err)
+	}
+
+	if len(posts) == 0 {
+		t.Fatalf("Expected at least one post but got none")
+	}
+
+	// loop to find the specific post we are testing and checking file content
+	var specifcPost map[string]interface{}
+	for i, _ := range posts {
+		// find the post of a certain user since we know they only made one post
+		if posts[i]["username"] == "testUser" && posts[i]["content"] == "Test post 2" {
+			specifcPost = posts[i]
+			break
+		}
+	}
+
+	// get parts of our metadata to request of desired post
+	postID := int(specifcPost["post_id"].(float64)) // Convert from float64
+	t.Logf("Got post with ID: %d", postID)
+	t.Logf("sending req: %s", "/api/posts/"+strconv.Itoa(postID))
+
+	req2 := httptest.NewRequest("GET", "/api/posts/"+strconv.Itoa(postID), nil)
+	req2 = mux.SetURLVars(req2, map[string]string{"id": strconv.Itoa(postID)})
+	rec2 := httptest.NewRecorder()
+
+	handlerInstance.HandleGetSpecificPost(rec2, req2)
+
+	// check if post recieved has the same content
+	var postSingle map[string]interface{}
+	err = json.NewDecoder(rec2.Body).Decode(&postSingle)
+	if err != nil {
+		t.Fatalf("Failed to decode posts JSON: %v", err)
+	}
+	t.Log(postSingle)
+	idP := int(postSingle["post_id"].(float64))
+
+	if idP == postID {
+		t.Log("post id matches")
+	} else {
+		t.Errorf("got %s", postSingle["post_id"])
+	}
+
+	if postSingle["content"] != "Test post 2" {
+		t.Errorf("Expected content '\"Test post 2\"', got '%s'", postSingle["content"])
+	}
+}
+
+func TestGetProfilePostsEndpoint(t *testing.T) {
+	db, userCreated := setupTestDB(t)
+	fm := database.NewFileManagerPath("../../../data") // example of creating fm with different folder path
+	defer db.Close()
+	//defer cleanupTestData(db, userCreated, t)
+	// sometimes you want to keep files to see them appear in dir list
+	defer cleanupTestDataAll(db, fm, userCreated, t)
+
+	if err := db.Register("testUser", "password"); err != nil {
+		t.Fatalf("Failed to register user: %v", err)
+	}
+	if err := db.Register("testUser2", "password"); err != nil {
+		t.Fatalf("Failed to register user: %v", err)
+	}
+	*userCreated = true
+
+	// Authenticate and retrieve user ID
+	userID, err := db.Authenticate("testUser", "password")
+	if err != nil {
+		t.Fatalf("Failed to log in: %v", err)
+	}
+
+	// login second user to check if we only get one user's posts
+	userID2, err2 := db.Authenticate("testUser2", "password")
+	if err2 != nil {
+		t.Fatalf("Failed to log in: %v", err)
+	}
+
+	// Prepare post request
+	postBody, err := json.Marshal(map[string]interface{}{
+		"user_id":   userID,
+		"content":   "Test post 1",
+		"file_name": "",
+		"media":     "",
+		"latitude":  37.7749,
+		"longitude": -122.4194,
+	})
+	if err != nil {
+		t.Fatalf("Failed to marshal JSON: %v", err)
+	}
+
+	req := httptest.NewRequest("POST", "/api/posts", bytes.NewBuffer(postBody))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handlerInstance := handler.RequestHandler{DB: db, FM: fm}
+	handlerInstance.HandleCreatePost(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Errorf("Expected status 201, got %d", rec.Code)
+	}
+
+	// Prepare 2nd post request
+	postBody, err = json.Marshal(map[string]interface{}{
+		"user_id":   userID2,
+		"content":   "Test post 2",
+		"file_name": "",
+		"media":     "",
+		"latitude":  37.7749,
+		"longitude": -122.4194,
+	})
+	if err != nil {
+		t.Fatalf("Failed to marshal JSON: %v", err)
+	}
+
+	req = httptest.NewRequest("POST", "/api/posts", bytes.NewBuffer(postBody))
+	req.Header.Set("Content-Type", "application/json")
+	rec = httptest.NewRecorder()
+
+	handlerInstance.HandleCreatePost(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Errorf("Expected status 201, got %d", rec.Code)
+	}
+
+	// Now need to check if we only get posts from user2
+
+	req2 := httptest.NewRequest("GET", "/api/profile/"+strconv.Itoa(userID2), nil)
+	req2 = mux.SetURLVars(req2, map[string]string{"id": strconv.Itoa(userID2)})
+	rec2 := httptest.NewRecorder()
+
+	handlerInstance.HandleGetProfilePosts(rec2, req2)
+
+	var data map[string]interface{}
+	var posts []map[string]interface{}
+	err = json.NewDecoder(rec2.Body).Decode(&data)
+	if err != nil {
+		t.Fatalf("Failed to decode posts JSON: %v", err)
+	}
+
+	if rawPosts, ok := data["posts"].([]interface{}); ok {
+		for _, p := range rawPosts {
+			if postMap, ok := p.(map[string]interface{}); ok {
+				posts = append(posts, postMap)
+			}
+		}
+	} else {
+		t.Error("posts is not []interface{}")
+	}
+
+	if len(posts) == 0 {
+		t.Fatalf("Expected at least one post but got none")
+	}
+
+	// loop to confirm all posts are from user2
+	for i, _ := range posts {
+		// find the post of a certain user since we know they only made one post
+		if posts[i]["username"] != "testUser2" {
+			t.Errorf("Error, got unexpected user id of %s", posts[i]["username"])
+			return
+		}
+	}
+
+	if posts[0]["username"] == "testUser2" && posts[0]["content"] != "Test post 2" {
+		t.Errorf("Error, got unexpected content of %s", posts[0]["content"])
+		return
+	}
+
+	// otherwise we are good and done
 }
