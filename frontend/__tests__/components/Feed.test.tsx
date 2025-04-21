@@ -4,7 +4,7 @@ import '@testing-library/jest-dom';
 import { Feed } from '@/components/features/Feed';
 import { getPosts } from '@/services/api';
 
-// Mock the dependencies
+// Mock dependencies
 jest.mock('lucide-react', () => ({
   SlidersHorizontal: () => <div data-testid="sliders-icon">Filters</div>,
   Loader2: () => <div data-testid="loader-icon">Loading...</div>,

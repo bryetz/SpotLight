@@ -16,6 +16,7 @@ func RegisterRoutes(router *mux.Router, h *handler.RequestHandler) {
 	// Post-related routes
 	router.HandleFunc("/api/posts", h.HandleGetPosts).Methods("GET")
 	router.HandleFunc("/api/posts", h.HandleCreatePost).Methods("POST")
+	router.HandleFunc("/api/posts/{id}", h.GetSpecificPost).Methods("GET")
 	router.HandleFunc("/api/posts/{id}", h.HandleDeletePost).Methods("DELETE")
 
 	// Like-related routes

@@ -209,6 +209,68 @@ func (db *DBInterface) GetPosts(reqLatitude float64, reqLongitude float64, dista
 	return posts, nil
 }
 
+// GetPostById gets a post by ID
+func (db *DBInterface) GetPostById(postId int) (map[string]interface{}, error) {
+	var post map[string]interface{}
+	// Updated Query: Join posts and users tables, select specific columns including username
+	query := `
+		SELECT p.id, p.user_id, u.username, p.content, p.latitude, p.longitude, p.created_at, p.file_name, p.like_count
+		FROM posts p
+		JOIN users u ON p.user_id = u.id
+		WHERE p.id = $1`
+
+	rows, err := db.pool.Query(context.Background(), query, postId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query post with ID %d: %w", postId, err)
+	}
+	defer rows.Close()
+
+	if rows.Next() {
+		var postID int
+		var userID int
+		var username, content, filename string
+		var latitude, longitude float64
+		var createdAt time.Time
+		var likeCount int
+
+		// Scan
+		if err := rows.Scan(&postID, &userID, &username, &content, &latitude, &longitude, &createdAt, &filename, &likeCount); err != nil {
+			log.Printf("Error scanning post row for ID %d: %v", postId, err)
+			return nil, fmt.Errorf("failed to scan post data for ID %d: %w", postId, err)
+		}
+
+		post = map[string]interface{}{
+			"post_id":    postID,
+			"user_id":    userID,
+			"username":   username,
+			"content":    content,
+			"latitude":   latitude,
+			"longitude":  longitude,
+			"created_at": createdAt.Format(time.RFC3339),
+			"file_name":  filename,
+			"like_count": likeCount,
+		}
+	} else {
+		if err := rows.Err(); err != nil {
+            log.Printf("Error iterating rows for post ID %d: %v", postId, err)
+            return nil, fmt.Errorf("error retrieving post data for ID %d: %w", postId, err)
+        }
+		return nil, fmt.Errorf("post with ID %d not found", postId)
+	}
+
+	// Check if there were more rows than expected (shouldn't happen)
+	if rows.Next() {
+		log.Printf("Warning: Multiple posts found for ID %d", postId)
+	}
+
+    if err := rows.Err(); err != nil {
+        log.Printf("Error after iterating rows for post ID %d: %v", postId, err)
+        return nil, fmt.Errorf("error completing retrieval for post ID %d: %w", postId, err)
+    }
+
+	return post, nil
+}
+
 // helper function to get last postId from userId
 func (db *DBInterface) GetLastPostByUser(userId int) (int, error) {
 	row, err := db.pool.Query(context.Background(), "SELECT * FROM posts WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1", userId)
