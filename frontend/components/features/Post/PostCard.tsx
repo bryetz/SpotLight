@@ -479,6 +479,7 @@ export function PostCard({ post, isClickable = true, onDelete }: PostCardProps) 
         <CardWrapper 
             className={`bg-black/20 backdrop-blur-[4px] border border-[#343536] rounded-lg p-4 relative ${isClickable ? 'cursor-pointer hover:border-[#4e4f50] transition-colors' : ''} ${isDeleting ? 'opacity-50 pointer-events-none' : ''}`}
             {...cardProps}
+            data-testid={`post-card-${post.post_id}`}
         >
             {isAuthenticated && userId === post.user_id && (
                 <button

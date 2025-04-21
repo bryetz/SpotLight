@@ -30,7 +30,7 @@ func setupCommentTest(t *testing.T) (*database.DBInterface, *handler.RequestHand
 		t.Fatalf("Failed to create post: %v", err)
 	}
 
-	posts, err := db.GetPosts(0, 0, -1)
+	posts, err := db.GetPosts(0, 0, -1, 20, 0, "", "")
 	if err != nil || len(posts) == 0 {
 		t.Fatalf("Failed to retrieve posts: %v", err)
 	}

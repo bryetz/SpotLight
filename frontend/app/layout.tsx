@@ -4,6 +4,8 @@ import "@/styles/globals.css";
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { AuthProvider } from '@/providers/AuthProvider';
+// Import Leaflet CSS globally
+import 'leaflet/dist/leaflet.css';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

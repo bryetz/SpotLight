@@ -47,26 +47,58 @@ export const deleteUser = (username: string) =>
   api.delete('/api/delete-user', { data: { username } });
 
 export const getPosts = async (params?: {
-  latitude?: number,
-  longitude?: number,
-  radius?: number,
+  latitude?: number; // Latitude from filter
+  longitude?: number; // Longitude from filter
+  radius?: number;
+  limit?: number;
+  offset?: number;
+  sort?: string; 
+  time?: string; 
 }) => {
-  // Round the radius to an integer to avoid decimal issues
-  const distance = Math.round(params?.radius || 25000); // 25 kilometer default range
-  let reqLatitude = Number.POSITIVE_INFINITY;
-  let reqLongitude = Number.POSITIVE_INFINITY;
+  // Use provided params or set defaults
+  const distance = Math.round(params?.radius ?? 25000); 
+  const limit = params?.limit ?? 20; 
+  const offset = params?.offset ?? 0; 
+  const sort = params?.sort ?? 'new'; 
+  const time = params?.time ?? 'all'; 
+  
+  // Prioritize location passed in params
+  let reqLatitude = params?.latitude;
+  let reqLongitude = params?.longitude;
+  let locationSource = 'filter'; // Keep track of where location came from
 
-  try {
-    const { latitude, longitude } = await getCurrentLocation();
-    reqLatitude = latitude;
-    reqLongitude = longitude;
-    console.log(`/api/posts?latitude=${reqLatitude}&longitude=${reqLongitude}&distance=${distance}`);
-    return api.get(`/api/posts?latitude=${reqLatitude}&longitude=${reqLongitude}&distance=${distance}`)
-  } catch (error) {
-    console.error("Geolocation failed or not available:", error);
-    return api.get(`/api/posts?latitude=${reqLatitude}&longitude=${reqLongitude}&distance=${distance}`)
+  // If no location was passed in params, try to get current geolocation
+  if (reqLatitude === undefined || reqLongitude === undefined) {
+    locationSource = 'geolocation';
+    try {
+      const { latitude, longitude } = await getCurrentLocation();
+      reqLatitude = latitude;
+      reqLongitude = longitude;
+    } catch (error) {
+      // If geolocation fails, use the fallback infinite values
+      console.error("Geolocation failed or not available, using fallback:", error);
+      locationSource = 'fallback';
+      reqLatitude = Number.POSITIVE_INFINITY;
+      reqLongitude = Number.POSITIVE_INFINITY;
+      // Note: When using fallback, distance might still apply if backend handles infinite coords
+    }
   }
-}
+
+  // Construct the base URL
+  let url = `/api/posts?limit=${limit}&offset=${offset}&sort=${sort}&time=${time}`;
+  
+  // Append location parameters ONLY IF they are valid numbers (not undefined or Infinity)
+  if (typeof reqLatitude === 'number' && typeof reqLongitude === 'number' && isFinite(reqLatitude) && isFinite(reqLongitude)) {
+      url += `&latitude=${reqLatitude}&longitude=${reqLongitude}&distance=${distance}`;
+       console.log(`Fetching posts with ${locationSource} location: ${url}`);
+  } else {
+       // Fetch without lat/lon if using fallback (or if filter explicitly provided invalid coords)
+       // The backend defaults to no location filter if lat/lon are missing/infinite
+       console.log(`Fetching posts without specific location (using ${locationSource}): ${url}`);
+  }
+
+  return api.get(url);
+};
 
 export const getPostById = (postId: number) =>
   api.get(`/api/posts/${postId}`);
@@ -139,5 +171,16 @@ export const sendDM = (sender_id: number, receiver_id: number, content: string) 
 
 export const getDMHistory = (sender_id: number, receiver_id: number) =>
   api.get('/api/dm/history', { params: { sender_id, receiver_id } });
+
+// Search endpoint
+export const searchContent = (query: string) => {
+  // Only make the request if the query is not empty
+  if (!query.trim()) {
+    // Return a promise that resolves to null or an empty structure 
+    // to avoid making an unnecessary API call and simplify SWR handling.
+    return Promise.resolve({ data: { users: [], posts: [] } });
+  }
+  return api.get('/api/search', { params: { query } });
+};
 
 export default api; 
