@@ -6,6 +6,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -155,33 +156,82 @@ func (db *DBInterface) CreatePostFile(userID int, content string, latitude, long
 	return nil
 }
 
-// GetPosts retrieves posts within a given distance (meters)
-func (db *DBInterface) GetPosts(reqLatitude float64, reqLongitude float64, distance int) ([]map[string]interface{}, error) {
+// GetPosts retrieves posts with optional filtering and pagination
+func (db *DBInterface) GetPosts(reqLatitude float64, reqLongitude float64, distance int, 
+                                limit int, offset int, sortOrder string, timeFilter string) ([]map[string]interface{}, error) {
 	if distance < 0 {
-		distance = 25000
+		distance = 25000 // Default distance if not provided or invalid
 	}
 
-	var query string
-	if math.IsInf(reqLatitude, 1) || math.IsInf(reqLongitude, 1) {
-		query = `SELECT p.id, p.user_id, u.username, p.content, p.latitude, p.longitude, p.created_at, p.file_name, p.like_count
-				 FROM posts p
-				 JOIN users u ON p.user_id = u.id
-				 ORDER BY p.created_at DESC;`
-	} else {
-		query = fmt.Sprintf(`
-			SELECT p.id, p.user_id, u.username, p.content, p.latitude, p.longitude, p.created_at, p.file_name, p.like_count
-			FROM posts p
-			JOIN users u ON p.user_id = u.id
-			WHERE ( 6371000 * acos(
-					cos(radians(%f)) * cos(radians(p.latitude)) *
-					cos(radians(p.longitude) - radians(%f)) +
-					sin(radians(%f)) * sin(radians(p.latitude))
-				) ) < %d
-			ORDER BY p.created_at DESC;`, reqLatitude, reqLongitude, reqLatitude, distance)
+	var queryBuilder strings.Builder
+	var args []interface{}
+	paramIndex := 1 // Parameter index for SQL query placeholders
+
+	// Base query
+	queryBuilder.WriteString(`SELECT p.id, p.user_id, u.username, p.content, p.latitude, p.longitude, p.created_at, p.file_name, p.like_count
+							  FROM posts p
+							  JOIN users u ON p.user_id = u.id`)
+
+	// WHERE clauses
+	whereClauses := []string{}
+
+	// Location filter
+	if !(math.IsInf(reqLatitude, 1) || math.IsInf(reqLongitude, 1)) {
+		whereClauses = append(whereClauses, fmt.Sprintf(`( 6371000 * acos(
+							cos(radians($%d)) * cos(radians(p.latitude)) *
+							cos(radians(p.longitude) - radians($%d)) +
+							sin(radians($%d)) * sin(radians(p.latitude))
+						) ) < $%d`, paramIndex, paramIndex+1, paramIndex, paramIndex+2))
+		args = append(args, reqLatitude, reqLongitude, distance)
+		paramIndex += 3
 	}
 
-	rows, err := db.pool.Query(context.Background(), query)
+	// Time filter
+	now := time.Now()
+	switch timeFilter {
+	case "today":
+		whereClauses = append(whereClauses, fmt.Sprintf("p.created_at >= DATE_TRUNC('day', $%d::timestamp)", paramIndex))
+		args = append(args, now)
+		paramIndex++
+	case "week":
+		whereClauses = append(whereClauses, fmt.Sprintf("p.created_at >= DATE_TRUNC('week', $%d::timestamp)", paramIndex))
+		args = append(args, now)
+		paramIndex++
+	case "month":
+		whereClauses = append(whereClauses, fmt.Sprintf("p.created_at >= DATE_TRUNC('month', $%d::timestamp)", paramIndex))
+		args = append(args, now)
+		paramIndex++
+	// "all" is default, no time clause needed
+	}
+
+	if len(whereClauses) > 0 {
+		queryBuilder.WriteString(" WHERE ")
+		queryBuilder.WriteString(strings.Join(whereClauses, " AND "))
+	}
+
+	// ORDER BY clause
+	queryBuilder.WriteString(" ORDER BY ")
+	switch sortOrder {
+	case "top":
+		queryBuilder.WriteString("p.like_count DESC, p.created_at DESC")
+	// case "hot": // Placeholder for future hot sort implementation
+	// 	 queryBuilder.WriteString("...") 
+	case "new":
+		fallthrough // Explicit fallthrough for clarity
+	default: // Default to new
+		queryBuilder.WriteString("p.created_at DESC")
+	}
+
+	// Pagination clause
+	queryBuilder.WriteString(fmt.Sprintf(" LIMIT $%d OFFSET $%d", paramIndex, paramIndex+1))
+	args = append(args, limit, offset)
+
+	finalQuery := queryBuilder.String()
+	// log.Printf("Executing query: %s with args: %v", finalQuery, args)
+
+	rows, err := db.pool.Query(context.Background(), finalQuery, args...)
 	if err != nil {
+		log.Printf("Error executing query: %v", err)
 		return nil, fmt.Errorf("failed to retrieve posts: %w", err)
 	}
 	defer rows.Close()
@@ -212,6 +262,10 @@ func (db *DBInterface) GetPosts(reqLatitude float64, reqLongitude float64, dista
 			"like_count": likeCount,
 		})
 	}
+
+	 if err := rows.Err(); err != nil {
+        return nil, fmt.Errorf("error iterating post results: %w", err)
+    }
 
 	return posts, nil
 }
@@ -589,4 +643,88 @@ func (db *DBInterface) DeleteComment(commentID int) error {
 	_, err := db.pool.Exec(context.Background(),
 		"DELETE FROM comments WHERE id=$1", commentID)
 	return err
+}
+
+// SearchUsers finds users by username (case-insensitive)
+func (db *DBInterface) SearchUsers(query string, limit int) ([]UserProfile, error) {
+	var users []UserProfile
+	sqlQuery := `
+		SELECT id, username, created_at 
+		FROM users 
+		WHERE username ILIKE $1 
+		ORDER BY username ASC 
+		LIMIT $2`
+	
+	rows, err := db.pool.Query(context.Background(), sqlQuery, "%"+query+"%", limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search users: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var user UserProfile
+		var createdAt time.Time
+		if err := rows.Scan(&user.UserID, &user.Username, &createdAt); err != nil {
+			log.Printf("Error scanning user row during search: %v", err)
+			continue 
+		}
+		user.CreatedAt = createdAt.Format(time.RFC3339) // Format timestamp
+		users = append(users, user)
+	}
+
+	if err := rows.Err(); err != nil {
+        return nil, fmt.Errorf("error iterating user search results: %w", err)
+    }
+
+	return users, nil
+}
+
+// SearchPosts finds posts by content (case-insensitive)
+func (db *DBInterface) SearchPosts(query string, limit int) ([]map[string]interface{}, error) {
+	var posts []map[string]interface{}
+	sqlQuery := `
+		SELECT p.id, p.user_id, u.username, p.content, p.latitude, p.longitude, p.created_at, p.file_name, p.like_count
+		FROM posts p
+		JOIN users u ON p.user_id = u.id
+		WHERE p.content ILIKE $1
+		ORDER BY p.created_at DESC
+		LIMIT $2`
+
+	rows, err := db.pool.Query(context.Background(), sqlQuery, "%"+query+"%", limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search posts: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var postID int
+		var userID int
+		var username, content, filename string
+		var latitude, longitude float64
+		var createdAt time.Time
+		var likeCount int
+
+		if err := rows.Scan(&postID, &userID, &username, &content, &latitude, &longitude, &createdAt, &filename, &likeCount); err != nil {
+			log.Printf("Error scanning post row during search: %v", err)
+			continue
+		}
+
+		posts = append(posts, map[string]interface{}{
+			"post_id":    postID,
+			"user_id":    userID,
+			"username":   username,
+			"content":    content,
+			"latitude":   latitude,
+			"longitude":  longitude,
+			"created_at": createdAt.Format(time.RFC3339),
+			"file_name":  filename,
+			"like_count": likeCount,
+		})
+	}
+
+	if err := rows.Err(); err != nil {
+        return nil, fmt.Errorf("error iterating post search results: %w", err)
+    }
+
+	return posts, nil
 }

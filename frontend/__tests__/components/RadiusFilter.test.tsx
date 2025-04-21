@@ -29,7 +29,7 @@ jest.mock('@/lib/slider_functions', () => ({
 }));
 
 // Import the component after mocking its dependencies
-import { RadiusFilter } from '@/components/features/Feed/RadiusFilter';
+import { RadiusFilter } from '@/components/features/Feed/FeedFilter';
 
 describe('TestRadiusFilter', () => {
   // Basic rendering test

@@ -13,6 +13,8 @@ import (
 	"net/url"
 	"path/filepath"
 	"strconv"
+	"strings"
+	"sync"
 
 	"SpotLight/backend/src/database"
 
@@ -202,11 +204,42 @@ func (h *RequestHandler) HandleGetPosts(w http.ResponseWriter, r *http.Request) 
 
 	distance, err := strconv.Atoi(params.Get("distance"))
 	if err != nil {
-		distance = -1
+		distance = -1 // Use -1 to signify default distance in DB function
 	}
 
-	// posts will have metadata as json including file_name which is what
-	posts, err := h.DB.GetPosts(latitude, longitude, distance)
+	// Parse limit and offset for pagination
+	limitStr := params.Get("limit")
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit <= 0 {
+		limit = 20 // Default limit
+	}
+
+	offsetStr := params.Get("offset")
+	offset, err := strconv.Atoi(offsetStr)
+	if err != nil || offset < 0 {
+		offset = 0 // Default offset
+	}
+
+	// Parse sort order
+	sortOrder := strings.ToLower(params.Get("sort"))
+	switch sortOrder { // Validate sort order
+	case "new", "top":
+		// Valid sort order
+	default:
+		sortOrder = "new" // Default sort order
+	}
+
+	// Parse time filter
+	timeFilter := strings.ToLower(params.Get("time"))
+	switch timeFilter { // Validate time filter
+	case "today", "week", "month", "all":
+		// Valid time filter
+	default:
+		timeFilter = "all" // Default time filter
+	}
+
+	// Fetch posts using the DB function with all parameters
+	posts, err := h.DB.GetPosts(latitude, longitude, distance, limit, offset, sortOrder, timeFilter)
 	if err != nil {
 		http.Error(w, `{"message": "Failed to retrieve posts"}`, http.StatusInternalServerError)
 		return
@@ -621,4 +654,61 @@ func (h *RequestHandler) HandleGetFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fmt.Printf("Successfully served file: %s\n", fileName)
+}
+
+// HandleSearch handles searching for users and posts
+func (h *RequestHandler) HandleSearch(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query().Get("query")
+	if query == "" {
+		http.Error(w, `{"message": "Search query cannot be empty"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Set a limit for results to prevent excessive data transfer
+	limit := 10 
+
+	// Perform searches concurrently for better performance
+	var users []database.UserProfile
+	var posts []map[string]interface{}
+	var userErr, postErr error
+	var wg sync.WaitGroup
+
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		users, userErr = h.DB.SearchUsers(query, limit)
+	}()
+
+	go func() {
+		defer wg.Done()
+		posts, postErr = h.DB.SearchPosts(query, limit)
+	}()
+
+	wg.Wait()
+
+	if userErr != nil {
+		log.Printf("Error searching users: %v", userErr)
+		// Decide if you want to return partial results or a full error
+	}
+	if postErr != nil {
+		log.Printf("Error searching posts: %v", postErr)
+		// Decide if you want to return partial results or a full error
+	}
+
+	// Handle cases where results might be nil from errors
+	if users == nil {
+        users = []database.UserProfile{}
+    }
+    if posts == nil {
+        posts = []map[string]interface{}{}
+    }
+
+	response := map[string]interface{}{
+		"users": users,
+		"posts": posts,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
