@@ -4,7 +4,7 @@
 - **STORY18: Profile pages** – Added user profile views and endpoint to retrieve user info + their posts.
 - **STORY19: Sharing post links** – Implemented unique post retrieval via `/api/posts/{id}` for link sharing.
 - **STORY20: Direct messaging** – Built DM system with REST + WebSocket support for sending/receiving messages.
-- **STORY21: Various improvements** – 
+- **STORY21: Various improvements** – Implemented Infinite Scroll, Search, and Advanced Filtering.
 
 ## Testing
 
@@ -13,9 +13,8 @@
 #### Component Unit Tests:
 - **TestLoginPage:** Verifies that the login form renders correctly and handles authentication responses.
 - **TestSubmitPage:** Tests the post submission form functionality and validation.
-- **TestFeed:** Validates the feed component's rendering, post loading, filtering capabilities, and error handling states. Also tests image/media displaying, likes, and comments.
-- **TestPostCard:** Ensures proper rendering of post content, interaction handling such as likes and comments, and date/location formatting.
-- **TestRadiusFilter:** Checks the radius filter slider functionality, value conversions, and callback handling.
+- **TestFeed:** Validates the feed component's rendering, post loading/pagination, new filtering capabilities, and error handling states. Also tests image/media displaying, likes, and comments.
+- **TestPostCard:** Ensures proper rendering of post content, interaction handling such as likes and comments and sharing, and date/location formatting.
 
 #### Utility Unit Tests:
 - **TestSliderFunctions:** Validates the utility functions for converting and formatting distance values used in the radius filter.
@@ -24,7 +23,7 @@
 #### Cypress End-to-End Tests:
 - **AuthSpec:** Tests the authentication flow, including login, registration, and error handling.
 - **HomePageSpec:** Verifies the home page functionality, including post loading and interaction with post content.
-- **RadiusFilterSpec:** Validates the radius filter component’s integration with the feed.
+- **NewFeaturesSpecs:** Tests the functionality of the newly implemented features, including post sharing, infinite scrolling, searching, profiles, and DMs.
 - **PostInteractionsSpec:** Verifies the feed displays posts and interaction buttons correctly.
 - **SubmitPostSpec:** Tests the post submission flow, including logging in, adding text and media to a post, and submitting.
 
