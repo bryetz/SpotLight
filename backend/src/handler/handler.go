@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	"mime"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 	"SpotLight/backend/src/database"
 
 	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
 )
 
 // RequestHandler manages API requests
@@ -216,20 +218,34 @@ func (h *RequestHandler) HandleGetPosts(w http.ResponseWriter, r *http.Request) 
 
 func (h *RequestHandler) GetProfilePosts(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	postID, err := strconv.Atoi(vars["id"])
+	userID, err := strconv.Atoi(vars["id"])
 	if err != nil {
-		http.Error(w, `{"message": "Invalid post ID"}`, http.StatusBadRequest)
+		http.Error(w, `{"message": "Invalid user ID"}`, http.StatusBadRequest)
 		return
 	}
 
-	posts, err := h.DB.GetUserPosts(postID)
+	// Call the updated DB function
+	userProfile, posts, err := h.DB.GetUserPosts(userID)
 	if err != nil {
-		http.Error(w, `{"message": "Failed to get post"}`, http.StatusInternalServerError)
+		// Check if the error is specifically "user not found"
+		if err.Error() == fmt.Sprintf("user not found: failed to query user profile for ID %d", userID) || 
+		   (err.Error() == "user not found: no rows in result set" && len(posts) == 0) {
+			http.Error(w, `{"message": "User not found"}`, http.StatusNotFound)
+		} else {
+			http.Error(w, fmt.Sprintf(`{"message": "Failed to get profile data: %v"}`, err), http.StatusInternalServerError)
+		}
 		return
 	}
 
+	// Structure the response
+	response := map[string]interface{}{
+		"user":  userProfile,
+		"posts": posts,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(posts)
+	json.NewEncoder(w).Encode(response)
 }
 
 func (h *RequestHandler) GetSpecificPost(w http.ResponseWriter, r *http.Request) {
@@ -270,6 +286,7 @@ func (h *RequestHandler) HandleSendDM(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(map[string]string{"message": "Message sent"})
 }
+
 func (h *RequestHandler) HandleGetDMHistory(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	senderID, _ := strconv.Atoi(query.Get("sender_id"))
@@ -289,24 +306,55 @@ func (h *RequestHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request)
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		http.Error(w, "WebSocket upgrade failed", http.StatusInternalServerError)
+		log.Printf("WebSocket upgrade failed for user %d: %v\n", userID, err)
+		
 		return
 	}
 
 	client := &WSClient{userID: userID, conn: conn}
 	Hub.register <- client
 
+	// connection closure and unregistration on function exit
+	defer func() {
+		Hub.unregister <- userID
+		conn.Close()
+		log.Printf("WebSocket connection closed for user %d", userID)
+	}()
+
+	log.Printf("WebSocket connection opened for user %d", userID)
+
 	for {
+		log.Printf("Attempting to read JSON from WebSocket for user %d...", userID)
 		var msg WSMessage
 		err := conn.ReadJSON(&msg)
 		if err != nil {
-			break
+			log.Printf("WebSocket read error for user %d: %v\n", userID, err)
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Printf("WebSocket specific close error for user %d: %v\n", userID, err)
+			}
+			break // Exit loop on read error or close
 		}
-		h.DB.InsertMessage(msg.From, msg.To, msg.Content) // Save to DB
+		// Add sender ID if missing (it should be the connected user)
+		if msg.From == 0 {
+			msg.From = userID
+		}
+
+		// Basic validation
+		if msg.To == 0 || msg.Content == "" {
+			log.Printf("Received invalid WebSocket message from user %d: %+v", userID, msg)
+			continue // Skip invalid messages
+		}
+
+		log.Printf("Received WebSocket message from %d to %d", msg.From, msg.To)
+
+		err = h.DB.InsertMessage(msg.From, msg.To, msg.Content) // Save to DB
+		if err != nil {
+			log.Printf("Failed to save DM to database from %d to %d: %v", msg.From, msg.To, err)
+		}
 		Hub.broadcast <- msg
 	}
 
-	Hub.unregister <- userID
+	// Note: The defer function handles unregistering and closing the connection
 }
 
 // HandleDeletePost removes a post by ID

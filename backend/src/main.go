@@ -54,6 +54,9 @@ func main() {
 		handlers.AllowedHeaders([]string{"Content-Type"}),
 	)(router)
 
+	// Start the WebSocket Hub
+	go handler.StartHub()
+
 	// Start the HTTP server
 	log.Printf("Server started on port %s", portNum)
 	fmt.Println("Press CTRL+C to stop the server.")

@@ -63,10 +63,13 @@ export const getPosts = async (params?: {
     console.log(`/api/posts?latitude=${reqLatitude}&longitude=${reqLongitude}&distance=${distance}`);
     return api.get(`/api/posts?latitude=${reqLatitude}&longitude=${reqLongitude}&distance=${distance}`)
   } catch (error) {
-    console.error(error);
+    console.error("Geolocation failed or not available:", error);
     return api.get(`/api/posts?latitude=${reqLatitude}&longitude=${reqLongitude}&distance=${distance}`)
   }
 }
+
+export const getPostById = (postId: number) =>
+  api.get(`/api/posts/${postId}`);
 
 export const createPost = (data: {
   user_id: number,
@@ -77,7 +80,7 @@ export const createPost = (data: {
   longitude: number 
 }) => api.post('/api/posts', data);
 
-export const deletePost = (postId: string) =>  // ts prolly dont work because idk if its param based or req based
+export const deletePost = (postId: number) => 
   api.delete(`/api/posts/${postId}`);
 
 
@@ -125,5 +128,16 @@ export const getFile = async ({
 // check if a post is liked by the user
 export const checkPostLiked = (postId: number, userId: number) =>
   api.get(`/api/posts/${postId}/liked`, { params: { userId } });
+
+// Get user profile and posts
+export const getProfile = (userId: number) => 
+  api.get(`/api/profile/${userId}`);
+
+// DM endpoints
+export const sendDM = (sender_id: number, receiver_id: number, content: string) =>
+  api.post('/api/dm/send', { sender_id, receiver_id, content });
+
+export const getDMHistory = (sender_id: number, receiver_id: number) =>
+  api.get('/api/dm/history', { params: { sender_id, receiver_id } });
 
 export default api; 

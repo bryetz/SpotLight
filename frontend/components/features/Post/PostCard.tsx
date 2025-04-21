@@ -1,16 +1,23 @@
 import { Post, Comment } from '@/types/post';
 import { MapPin, MessageCircle, Heart, Share2, Loader2, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, MouseEvent, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
-import { likePost, unlikePost, getComments, createComment, getFile, checkPostLiked, deleteComment } from '@/services/api';
+import { likePost, unlikePost, getComments, createComment, getFile, checkPostLiked, deleteComment, deletePost as apiDeletePost } from '@/services/api';
 import { formatDistanceToNow, format, parseISO } from 'date-fns';
 
 interface ExpandedComments {
     [key: number]: boolean;
 }
 
-export function PostCard({ post }: { post: Post }) {
+interface PostCardProps {
+    post: Post;
+    isClickable?: boolean;
+    onDelete?: (postId: number) => void;
+}
+
+export function PostCard({ post, isClickable = true, onDelete }: PostCardProps) {
     const router = useRouter();
     const { userId, isAuthenticated, username } = useAuth();
 
@@ -26,6 +33,7 @@ export function PostCard({ post }: { post: Post }) {
     const [expandedComments, setExpandedComments] = useState<ExpandedComments>({});
     const [replyingTo, setReplyingTo] = useState<number | null>(null);
     const [replyInput, setReplyInput] = useState<string>('');
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         fetchComments();
@@ -209,6 +217,95 @@ export function PostCard({ post }: { post: Post }) {
         }
     };
 
+    const handleCardClick = () => {
+        if (isClickable) {
+             const postIdNum = Number(post.post_id);
+            if (!isNaN(postIdNum)) {
+                router.push(`/post/${postIdNum}`);
+            } else {
+                console.error('Invalid post_id for navigation');
+            }
+        }
+    };
+    
+    const handleShare = async (e: MouseEvent) => {
+        e.stopPropagation();
+        const postIdNum = Number(post.post_id);
+        if (isNaN(postIdNum)) {
+            console.error('Invalid post_id for sharing');
+            return;
+        }
+        
+        const shareData = {
+            title: `SpotLight Post by ${post.username}`,
+            text: post.content.substring(0, 100) + (post.content.length > 100 ? '...' : ''),
+            url: `${window.location.origin}/post/${postIdNum}`
+        };
+
+        try {
+            if (navigator.share) {
+                await navigator.share(shareData);
+                console.log('Post shared successfully via Web Share API');
+            } else if (navigator.clipboard) {
+                await navigator.clipboard.writeText(shareData.url);
+                alert('Post URL copied to clipboard!');
+            } else {
+                 alert('Sharing is not supported on this browser.');
+            }
+        } catch (err: any) {
+            if (err.name !== 'AbortError') {
+                console.error('Error sharing post:', err);
+                try {
+                    if (navigator.clipboard) {
+                        await navigator.clipboard.writeText(shareData.url);
+                        alert('Sharing failed. Post URL copied to clipboard instead.');
+                    } else {
+                         alert('Failed to share or copy URL.');
+                    }
+                } catch (copyErr) {
+                    console.error('Error copying URL as fallback:', copyErr);
+                    alert('Failed to share or copy URL.');
+                }
+            } else {
+                console.log('Share action cancelled by user.');
+            }
+        }
+    };
+
+    const handleDeletePostClick = async (e: MouseEvent) => {
+        e.stopPropagation();
+        
+        const postIdNum = Number(post.post_id);
+        if (isNaN(postIdNum)) {
+            console.error('Invalid post_id for deletion');
+            return;
+        }
+
+        if (!isAuthenticated || userId !== post.user_id) {
+             console.warn('Attempted to delete post without authentication or ownership.');
+            return;
+        }
+        
+        if (window.confirm('Are you sure you want to delete this post? This action cannot be undone.')) {
+            setIsDeleting(true);
+            setError(null);
+            try {
+                await apiDeletePost(postIdNum);
+                console.log(`Post ${postIdNum} deleted successfully.`);
+                if (onDelete) {
+                    onDelete(postIdNum);
+                } else {
+                    router.push('/'); 
+                }
+            } catch (err) {
+                console.error(`Failed to delete post ${postIdNum}:`, err);
+                setError('Failed to delete post.');
+                setIsDeleting(false);
+                setTimeout(() => setError(null), 3000);
+            }
+        }
+    };
+
     const renderComment = (comment: Comment, depth: number = 0) => {
         const isExpanded = expandedComments[comment.comment_id] ?? true;
         const hasReplies = comment.replies && comment.replies.length > 0;
@@ -235,7 +332,13 @@ export function PostCard({ post }: { post: Post }) {
                 )}
                 <div className={`pl-4 transition-all duration-200 ease-in-out ${isExpanded ? 'opacity-100' : 'opacity-60'}`}>
                     <div className="flex items-center gap-2">
-                        <span className="font-medium text-white/90">{comment.username}</span>
+                        <Link 
+                            href={`/profile/${comment.user_id}`} 
+                            onClick={(e) => e.stopPropagation()} 
+                            className="font-medium text-white/90 hover:underline"
+                        >
+                            {comment.username}
+                        </Link>
                         <span className="text-[#818384] text-xs">
                             {formatDate(comment.created_at)}
                         </span>
@@ -369,13 +472,35 @@ export function PostCard({ post }: { post: Post }) {
         );
     };
 
+    const CardWrapper = isClickable ? 'div' : 'div';
+    const cardProps = isClickable ? { onClick: handleCardClick, role: 'button', tabIndex: 0, 'aria-label': `View post by ${post.username}` } : {};
+
     return (
-        <div className="bg-black/20 backdrop-blur-[4px] border border-[#343536] rounded-lg p-4">
+        <CardWrapper 
+            className={`bg-black/20 backdrop-blur-[4px] border border-[#343536] rounded-lg p-4 relative ${isClickable ? 'cursor-pointer hover:border-[#4e4f50] transition-colors' : ''} ${isDeleting ? 'opacity-50 pointer-events-none' : ''}`}
+            {...cardProps}
+        >
+            {isAuthenticated && userId === post.user_id && (
+                <button
+                    onClick={handleDeletePostClick}
+                    className="absolute top-2 right-2 p-1.5 text-[#818384] hover:text-red-400 bg-black/30 rounded-full transition-colors z-10"
+                    title="Delete post"
+                    aria-label="Delete post"
+                    disabled={isDeleting}
+                >
+                    {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                </button>
+            )}
+            
             <div className="flex items-center mb-3">
                 <div className="flex items-center text-sm text-[#818384]">
-                    <span className="font-medium text-white/90">
+                    <Link 
+                        href={`/profile/${post.user_id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="font-medium text-white/90 hover:underline"
+                    >
                         {post.username}
-                    </span>
+                    </Link>
                     <span className="mx-1.5">•</span>
                     <span>
                         {format(parseISO(post.created_at.replace('Z', '')), 'MMM d, h:mm a')}
@@ -384,8 +509,7 @@ export function PostCard({ post }: { post: Post }) {
             </div>
 
             <p className="text-[#d7dadc] mb-4 whitespace-pre-wrap">{post.content}</p>
-
-            {/* Media Display */}
+            
             {post.file_name && (
                 <div className="mb-4">
                     {isLoading ? (
@@ -423,34 +547,46 @@ export function PostCard({ post }: { post: Post }) {
                 </span>
             </div>
 
-            <div className="flex items-center space-x-4 pt-2 border-t border-[#343536]">
-                <button
+            <div className="flex items-center space-x-4 pt-3 border-t border-[#343536]">
+                <button 
                     onClick={handleLike}
-                    className={`flex items-center space-x-1 text-sm ${liked ? 'text-red-400' : 'text-[#818384]'} hover:text-red-400 transition-colors`}
+                    className={`flex items-center space-x-1.5 text-sm ${liked ? 'text-red-400 font-medium' : 'text-[#818384]'} hover:text-red-400 transition-colors duration-150`}
+                    aria-pressed={liked}
+                    aria-label={`Like post, currently ${likes} likes`}
                 >
-                    <Heart className={`w-4 h-4 ${liked ? 'fill-current' : ''}`} />
+                    <Heart className={`w-4 h-4 transition-transform ${liked ? 'fill-current scale-110' : ''}`} />
                     <span>{likes}</span>
                 </button>
-
-                <button
-                    onClick={() => {
+                
+                <button 
+                     onClick={(e) => {
+                        e.stopPropagation();
                         setShowComments(!showComments);
-                        if (!showComments) fetchComments();
+                        if (!showComments && comments.length === 0) {
+                            fetchComments();
+                        }
                     }}
-                    className="flex items-center space-x-1 text-sm text-[#818384] hover:text-white transition-colors"
+                    className="flex items-center space-x-1.5 text-sm text-[#818384] hover:text-white transition-colors duration-150"
+                     aria-expanded={showComments}
+                     aria-controls={`comments-section-${post.post_id}`}
                 >
                     <MessageCircle className="w-4 h-4" />
-                    <span>{Array.isArray(comments) ? comments.length : 0}</span>
+                     <span>
+                        {isLoadingComments ? '...' : Array.isArray(comments) ? comments.length : 0}
+                     </span>
                 </button>
-
-                <button
-                    className="flex items-center space-x-1 text-sm text-[#818384] hover:text-white transition-colors ml-auto"
+                
+                <button 
+                    onClick={handleShare}
+                    className="flex items-center space-x-1.5 text-sm text-[#818384] hover:text-white transition-colors duration-150 ml-auto"
+                    aria-label="Share post"
                 >
                     <Share2 className="w-4 h-4" />
+                    <span>Share</span>
                 </button>
             </div>
 
             {renderComments()}
-        </div>
+        </CardWrapper>
     );
 }
