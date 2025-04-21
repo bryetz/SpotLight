@@ -323,9 +323,9 @@ func (db *DBInterface) GetPostById(postId int) (map[string]interface{}, error) {
 		}
 	} else {
 		if err := rows.Err(); err != nil {
-            log.Printf("Error iterating rows for post ID %d: %v", postId, err)
-            return nil, fmt.Errorf("error retrieving post data for ID %d: %w", postId, err)
-        }
+			log.Printf("Error iterating rows for post ID %d: %v", postId, err)
+			return nil, fmt.Errorf("error retrieving post data for ID %d: %w", postId, err)
+		}
 		return nil, fmt.Errorf("post with ID %d not found", postId)
 	}
 
@@ -334,10 +334,10 @@ func (db *DBInterface) GetPostById(postId int) (map[string]interface{}, error) {
 		log.Printf("Warning: Multiple posts found for ID %d", postId)
 	}
 
-    if err := rows.Err(); err != nil {
-        log.Printf("Error after iterating rows for post ID %d: %v", postId, err)
-        return nil, fmt.Errorf("error completing retrieval for post ID %d: %w", postId, err)
-    }
+	if err := rows.Err(); err != nil {
+		log.Printf("Error after iterating rows for post ID %d: %v", postId, err)
+		return nil, fmt.Errorf("error completing retrieval for post ID %d: %w", postId, err)
+	}
 
 	return post, nil
 }
@@ -559,11 +559,11 @@ func (db *DBInterface) GetNestedComments(postID int) ([]*Comment, error) {
 		c.ParentID = parentID
 		commentMap[c.ID] = &c
 	}
-	
+
 	if err := rows.Err(); err != nil {
-        log.Printf("Error iterating comment rows: %v", err)
-        return nil, err
-    }
+		log.Printf("Error iterating comment rows: %v", err)
+		return nil, err
+	}
 
 	for _, comment := range commentMap {
 		if comment.ParentID != nil {
