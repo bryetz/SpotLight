@@ -16,6 +16,16 @@ A geolocation-based platform for sharing and discovering posts tied to places ar
 * ```npm install```
 * ```npm run dev```
 
+### For running frontend tests:
+#### Unit Tests:
+* ```cd frontend```
+* ```npm test```
+
+#### Cypress Tests:
+* ```cd frontend```
+* ```npx cypress open```
+* Select test to run in the GUI
+
 ## Members
 
 * Boris Russanov
