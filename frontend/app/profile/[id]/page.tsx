@@ -5,6 +5,8 @@ import { useParams } from 'next/navigation';
 import { getProfile } from '@/services/api';
 import { Post } from '@/types/post';
 import { PostCard } from '@/components/features/Post/PostCard';
+import { DmButton } from '@/components/features/DM/DmButton';
+import { useAuth } from '@/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
@@ -21,19 +23,20 @@ interface ProfileData {
 
 export default function ProfilePage() {
     const params = useParams();
-    const userId = params?.id ? parseInt(params.id as string, 10) : null;
+    const profileUserId = params?.id ? parseInt(params.id as string, 10) : null;
+    const { userId: loggedInUserId, isAuthenticated } = useAuth();
     const [profileData, setProfileData] = useState<ProfileData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (userId) {
-            fetchProfileData(userId);
+        if (profileUserId) {
+            fetchProfileData(profileUserId);
         } else {
             setError('Invalid user ID.');
             setLoading(false);
         }
-    }, [userId]);
+    }, [profileUserId]);
 
     const fetchProfileData = async (id: number) => {
         setLoading(true);
@@ -82,11 +85,17 @@ export default function ProfilePage() {
     }
 
     const { user, posts } = profileData;
+    const isOwnProfile = isAuthenticated && loggedInUserId === user.user_id;
 
     return (
         <div className="max-w-4xl mx-auto px-4 py-8">
             <div className="bg-black/20 backdrop-blur-[4px] border border-[#343536] rounded-lg p-6 mb-8">
-                <h1 className="text-3xl font-bold text-white mb-2">{user.username}</h1>
+                <div className="flex items-center justify-between mb-2">
+                    <h1 className="text-3xl font-bold text-white">{user.username}</h1>
+                    {isAuthenticated && !isOwnProfile && (
+                        <DmButton recipientUserId={user.user_id} recipientUsername={user.username} />
+                    )}
+                </div>
                 <p className="text-sm text-[#818384]">
                     Joined: {format(parseISO(user.created_at.replace('Z', '')), 'MMMM d, yyyy')}
                 </p>

@@ -33,4 +33,9 @@ func RegisterRoutes(router *mux.Router, h *handler.RequestHandler) {
 
 	// Post file related routes
 	router.HandleFunc("/api/file", h.HandleGetFile).Methods("GET")
+
+	// DM-related routes
+	router.HandleFunc("/api/dm/send", h.HandleSendDM).Methods("POST")
+	router.HandleFunc("/api/dm/history", h.HandleGetDMHistory).Methods("GET")
+	router.HandleFunc("/ws", h.HandleWebSocket)
 }

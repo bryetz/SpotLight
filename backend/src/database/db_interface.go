@@ -323,9 +323,9 @@ func (db *DBInterface) GetPostById(postId int) (map[string]interface{}, error) {
 		}
 	} else {
 		if err := rows.Err(); err != nil {
-            log.Printf("Error iterating rows for post ID %d: %v", postId, err)
-            return nil, fmt.Errorf("error retrieving post data for ID %d: %w", postId, err)
-        }
+			log.Printf("Error iterating rows for post ID %d: %v", postId, err)
+			return nil, fmt.Errorf("error retrieving post data for ID %d: %w", postId, err)
+		}
 		return nil, fmt.Errorf("post with ID %d not found", postId)
 	}
 
@@ -334,12 +334,50 @@ func (db *DBInterface) GetPostById(postId int) (map[string]interface{}, error) {
 		log.Printf("Warning: Multiple posts found for ID %d", postId)
 	}
 
-    if err := rows.Err(); err != nil {
-        log.Printf("Error after iterating rows for post ID %d: %v", postId, err)
-        return nil, fmt.Errorf("error completing retrieval for post ID %d: %w", postId, err)
-    }
+	if err := rows.Err(); err != nil {
+		log.Printf("Error after iterating rows for post ID %d: %v", postId, err)
+		return nil, fmt.Errorf("error completing retrieval for post ID %d: %w", postId, err)
+	}
 
 	return post, nil
+}
+
+func (db *DBInterface) InsertMessage(senderID, receiverID int, content string) error {
+	_, err := db.pool.Exec(context.Background(),
+		"INSERT INTO messages (sender_id, receiver_id, content) VALUES ($1, $2, $3)",
+		senderID, receiverID, content)
+	return err
+}
+
+func (db *DBInterface) GetMessages(senderID, receiverID int) ([]map[string]interface{}, error) {
+	rows, err := db.pool.Query(context.Background(), `
+		SELECT id, sender_id, receiver_id, content, created_at 
+		FROM messages 
+		WHERE (sender_id=$1 AND receiver_id=$2) OR (sender_id=$2 AND receiver_id=$1)
+		ORDER BY created_at ASC`, senderID, receiverID)
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []map[string]interface{}
+	for rows.Next() {
+		var id, sID, rID int
+		var content string
+		var createdAt time.Time
+		if err := rows.Scan(&id, &sID, &rID, &content, &createdAt); err != nil {
+			continue
+		}
+		messages = append(messages, map[string]interface{}{
+			"id":          id,
+			"sender_id":   sID,
+			"receiver_id": rID,
+			"content":     content,
+			"created_at":  createdAt.Format(time.RFC3339),
+		})
+	}
+	return messages, nil
 }
 
 // helper function to get last postId from userId
@@ -521,11 +559,11 @@ func (db *DBInterface) GetNestedComments(postID int) ([]*Comment, error) {
 		c.ParentID = parentID
 		commentMap[c.ID] = &c
 	}
-	
+
 	if err := rows.Err(); err != nil {
-        log.Printf("Error iterating comment rows: %v", err)
-        return nil, err
-    }
+		log.Printf("Error iterating comment rows: %v", err)
+		return nil, err
+	}
 
 	for _, comment := range commentMap {
 		if comment.ParentID != nil {

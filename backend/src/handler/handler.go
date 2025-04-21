@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	"mime"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 	"SpotLight/backend/src/database"
 
 	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
 )
 
 // RequestHandler manages API requests
@@ -262,6 +264,97 @@ func (h *RequestHandler) HandleGetSpecificPost(w http.ResponseWriter, r *http.Re
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(post)
+}
+
+func (h *RequestHandler) HandleSendDM(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		SenderID   int    `json:"sender_id"`
+		ReceiverID int    `json:"receiver_id"`
+		Content    string `json:"content"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"message": "Invalid payload"}`, http.StatusBadRequest)
+		return
+	}
+
+	err := h.DB.InsertMessage(req.SenderID, req.ReceiverID, req.Content)
+	if err != nil {
+		http.Error(w, `{"message": "Failed to send message"}`, http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]string{"message": "Message sent"})
+}
+
+func (h *RequestHandler) HandleGetDMHistory(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	senderID, _ := strconv.Atoi(query.Get("sender_id"))
+	receiverID, _ := strconv.Atoi(query.Get("receiver_id"))
+
+	messages, err := h.DB.GetMessages(senderID, receiverID)
+	if err != nil {
+		http.Error(w, `{"message": "Failed to fetch messages"}`, http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(messages)
+}
+
+func (h *RequestHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+	userID, _ := strconv.Atoi(r.URL.Query().Get("user_id"))
+
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("WebSocket upgrade failed for user %d: %v\n", userID, err)
+
+		return
+	}
+
+	client := &WSClient{userID: userID, conn: conn}
+	Hub.register <- client
+
+	// connection closure and unregistration on function exit
+	defer func() {
+		Hub.unregister <- userID
+		conn.Close()
+		log.Printf("WebSocket connection closed for user %d", userID)
+	}()
+
+	log.Printf("WebSocket connection opened for user %d", userID)
+
+	for {
+		log.Printf("Attempting to read JSON from WebSocket for user %d...", userID)
+		var msg WSMessage
+		err := conn.ReadJSON(&msg)
+		if err != nil {
+			log.Printf("WebSocket read error for user %d: %v\n", userID, err)
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Printf("WebSocket specific close error for user %d: %v\n", userID, err)
+			}
+			break // Exit loop on read error or close
+		}
+		// Add sender ID if missing (it should be the connected user)
+		if msg.From == 0 {
+			msg.From = userID
+		}
+
+		// Basic validation
+		if msg.To == 0 || msg.Content == "" {
+			log.Printf("Received invalid WebSocket message from user %d: %+v", userID, msg)
+			continue // Skip invalid messages
+		}
+
+		log.Printf("Received WebSocket message from %d to %d", msg.From, msg.To)
+
+		err = h.DB.InsertMessage(msg.From, msg.To, msg.Content) // Save to DB
+		if err != nil {
+			log.Printf("Failed to save DM to database from %d to %d: %v", msg.From, msg.To, err)
+		}
+		Hub.broadcast <- msg
+	}
+
+	// Note: The defer function handles unregistering and closing the connection
 }
 
 // HandleDeletePost removes a post by ID

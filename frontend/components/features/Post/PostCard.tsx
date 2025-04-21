@@ -8,7 +8,7 @@ import { likePost, unlikePost, getComments, createComment, getFile, checkPostLik
 import { formatDistanceToNow, format, parseISO } from 'date-fns';
 
 interface ExpandedComments {
-  [key: number]: boolean;
+    [key: number]: boolean;
 }
 
 interface PostCardProps {
@@ -20,7 +20,7 @@ interface PostCardProps {
 export function PostCard({ post, isClickable = true, onDelete }: PostCardProps) {
     const router = useRouter();
     const { userId, isAuthenticated, username } = useAuth();
-    
+
     const [likes, setLikes] = useState(post.like_count);
     const [liked, setLiked] = useState(false);
     const [comments, setComments] = useState<Comment[]>([]);
@@ -117,13 +117,13 @@ export function PostCard({ post, isClickable = true, onDelete }: PostCardProps) 
                 parent_id: parentId || undefined
             });
             console.log('Comment creation response:', response.data);
-            
+
             if (parentId) {
                 setReplyInput('');
             } else {
                 setCommentInput('');
             }
-            
+
             setReplyingTo(null);
             fetchComments();
         } catch (err) {
@@ -135,7 +135,7 @@ export function PostCard({ post, isClickable = true, onDelete }: PostCardProps) 
         try {
             setIsLoading(true);
             setError(null);
-            
+
             console.log('Requesting file:', {
                 userId: post.user_id,
                 postId: post.post_id,
@@ -151,13 +151,13 @@ export function PostCard({ post, isClickable = true, onDelete }: PostCardProps) 
             // Convert array buffer to base64
             const arrayBuffer = response.data;
             const base64 = arrayBufferToBase64(arrayBuffer);
-            
+
             // Determine content type from file extension
             const ext = post.file_name!.split('.').pop()?.toLowerCase();
             const isVideo = ['mp4', 'mov', 'quicktime'].includes(ext || '');
             const mimeType = isVideo ? 'video' : 'image';
             const dataUrl = `data:${mimeType}/${ext};base64,${base64}`;
-            
+
             setMediaData(dataUrl);
         } catch (error: any) {
             console.error('Error loading media:', error);
@@ -317,8 +317,8 @@ export function PostCard({ post, isClickable = true, onDelete }: PostCardProps) 
         };
 
         return (
-            <div 
-                key={comment.comment_id} 
+            <div
+                key={comment.comment_id}
                 className={`relative ${depth > 0 ? 'ml-4 mt-2' : 'mt-4'}`}
             >
                 {depth > 0 && (
@@ -353,7 +353,7 @@ export function PostCard({ post, isClickable = true, onDelete }: PostCardProps) 
                         )}
                     </div>
                     <p className="text-white/80 mt-1">{comment.content}</p>
-                    
+
                     <div className="flex items-center gap-4 mt-2">
                         <button
                             onClick={() => setReplyingTo(comment.comment_id)}
@@ -415,7 +415,7 @@ export function PostCard({ post, isClickable = true, onDelete }: PostCardProps) 
                     )}
 
                     {hasReplies && comment.replies && (
-                        <div 
+                        <div
                             className={`
                                 overflow-hidden transition-all duration-200 ease-in-out
                                 ${isExpanded ? 'max-h-[5000px] opacity-100' : 'max-h-0 opacity-0'}
@@ -523,13 +523,13 @@ export function PostCard({ post, isClickable = true, onDelete }: PostCardProps) 
                     ) : mediaData && (
                         <div className="relative">
                             {post.file_name.match(/\.(mp4|mov|quicktime)$/i) ? (
-                                <video 
+                                <video
                                     src={mediaData}
                                     controls
                                     className="w-full rounded-lg max-h-[512px] object-contain bg-black/40"
                                 />
                             ) : (
-                                <img 
+                                <img
                                     src={mediaData}
                                     alt="Post media"
                                     className="w-full rounded-lg max-h-[512px] object-contain bg-black/40"
@@ -539,7 +539,7 @@ export function PostCard({ post, isClickable = true, onDelete }: PostCardProps) 
                     )}
                 </div>
             )}
-            
+
             <div className="flex items-center text-xs text-[#818384] font-medium mb-4">
                 <MapPin className="w-3.5 h-3.5 mr-1" />
                 <span>
