@@ -4,6 +4,7 @@ backend/.env
 backend/*.exe
 backend/*.bat
 .env
+.idea
 
 data/*
 !data/README.md

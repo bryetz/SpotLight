@@ -249,7 +249,7 @@ func (h *RequestHandler) HandleGetPosts(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(posts)
 }
 
-func (h *RequestHandler) GetProfilePosts(w http.ResponseWriter, r *http.Request) {
+func (h *RequestHandler) HandleGetProfilePosts(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	userID, err := strconv.Atoi(vars["id"])
 	if err != nil {
@@ -261,8 +261,8 @@ func (h *RequestHandler) GetProfilePosts(w http.ResponseWriter, r *http.Request)
 	userProfile, posts, err := h.DB.GetUserPosts(userID)
 	if err != nil {
 		// Check if the error is specifically "user not found"
-		if err.Error() == fmt.Sprintf("user not found: failed to query user profile for ID %d", userID) || 
-		   (err.Error() == "user not found: no rows in result set" && len(posts) == 0) {
+		if err.Error() == fmt.Sprintf("user not found: failed to query user profile for ID %d", userID) ||
+			(err.Error() == "user not found: no rows in result set" && len(posts) == 0) {
 			http.Error(w, `{"message": "User not found"}`, http.StatusNotFound)
 		} else {
 			http.Error(w, fmt.Sprintf(`{"message": "Failed to get profile data: %v"}`, err), http.StatusInternalServerError)
@@ -281,7 +281,7 @@ func (h *RequestHandler) GetProfilePosts(w http.ResponseWriter, r *http.Request)
 	json.NewEncoder(w).Encode(response)
 }
 
-func (h *RequestHandler) GetSpecificPost(w http.ResponseWriter, r *http.Request) {
+func (h *RequestHandler) HandleGetSpecificPost(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	postID, err := strconv.Atoi(vars["id"])
 	if err != nil {
@@ -340,7 +340,6 @@ func (h *RequestHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request)
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("WebSocket upgrade failed for user %d: %v\n", userID, err)
-		
 		return
 	}
 
@@ -665,7 +664,7 @@ func (h *RequestHandler) HandleSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Set a limit for results to prevent excessive data transfer
-	limit := 10 
+	limit := 10
 
 	// Perform searches concurrently for better performance
 	var users []database.UserProfile
@@ -698,11 +697,11 @@ func (h *RequestHandler) HandleSearch(w http.ResponseWriter, r *http.Request) {
 
 	// Handle cases where results might be nil from errors
 	if users == nil {
-        users = []database.UserProfile{}
-    }
-    if posts == nil {
-        posts = []map[string]interface{}{}
-    }
+		users = []database.UserProfile{}
+	}
+	if posts == nil {
+		posts = []map[string]interface{}{}
+	}
 
 	response := map[string]interface{}{
 		"users": users,
